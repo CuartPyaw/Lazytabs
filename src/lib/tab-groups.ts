@@ -1,10 +1,42 @@
-import { matchingRule } from './rules';
+import { matchingRule, type GroupColor } from './rules';
 import { getSettings } from './settings';
+
+const pendingGroups = new Map<string, Promise<number>>();
 
 function hostname(url?: string) {
   if (!url) return undefined;
   const parsed = new URL(url);
   return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.hostname : undefined;
+}
+
+async function moveToGroup(tabId: number, windowId: number, groupName: string, color: GroupColor) {
+  const key = `${windowId}:${groupName}`;
+  const pendingGroup = pendingGroups.get(key);
+  if (pendingGroup) {
+    await chrome.tabs.group({ groupId: await pendingGroup, tabIds: [tabId] });
+    return;
+  }
+
+  const groupId = (async () => {
+    const existing = await chrome.tabGroups.query({ windowId });
+    const destination = existing.find((group) => group.title === groupName);
+
+    if (destination) {
+      await chrome.tabs.group({ groupId: destination.id, tabIds: [tabId] });
+      return destination.id;
+    }
+
+    const created = await chrome.tabs.group({ createProperties: { windowId }, tabIds: [tabId] });
+    await chrome.tabGroups.update(created, { color, title: groupName });
+    return created;
+  })();
+
+  pendingGroups.set(key, groupId);
+  try {
+    await groupId;
+  } finally {
+    pendingGroups.delete(key);
+  }
 }
 
 export async function groupTab(tabId: number) {
@@ -18,15 +50,7 @@ export async function groupTab(tabId: number) {
   const rule = host ? matchingRule(host, settings.rules) : undefined;
   if (!rule || tab.windowId === undefined) return false;
 
-  const existing = await chrome.tabGroups.query({ windowId: tab.windowId });
-  const destination = existing.find((group) => group.title === rule.groupName);
-
-  if (destination) {
-    await chrome.tabs.group({ groupId: destination.id, tabIds: [tabId] });
-  } else {
-    const groupId = await chrome.tabs.group({ createProperties: { windowId: tab.windowId }, tabIds: [tabId] });
-    await chrome.tabGroups.update(groupId, { color: rule.color, title: rule.groupName });
-  }
+  await moveToGroup(tabId, tab.windowId, rule.groupName, rule.color);
 
   return true;
 }
