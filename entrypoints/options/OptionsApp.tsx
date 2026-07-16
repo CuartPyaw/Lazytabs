@@ -197,9 +197,9 @@ export function OptionsApp() {
                     {patterns.map((pattern) => editingRule?.pattern === pattern ? (
                       <input autoFocus aria-label={`编辑 ${pattern}`} className="min-w-40 flex-1 bg-transparent text-sm outline-none" key={pattern} value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} />
                     ) : (
-                      <Chip className="gap-1" key={pattern} size="sm" variant="soft" role="listitem">
+                      <Chip className="gap-1.5 border border-default/80 bg-surface px-2.5 py-1.5 text-sm shadow-sm" key={pattern} variant="soft" role="listitem">
                         <button aria-label={`编辑 ${pattern}`} className="border-0 bg-transparent p-0 text-left text-inherit" type="button" onClick={() => { setEditingRule({ pattern, value: pattern }); setPasteError(undefined); }}>{pattern}</button>
-                        <Button isIconOnly aria-label={`删除 ${pattern}`} className="size-4 min-h-4 min-w-4 text-inherit" size="sm" variant="tertiary" onPress={() => setPatterns(patterns.filter((item) => item !== pattern))}><X size={13} strokeWidth={2} /></Button>
+                        <Button isIconOnly aria-label={`删除 ${pattern}`} className="size-5 min-h-5 min-w-5 text-inherit" size="sm" variant="tertiary" onPress={() => setPatterns(patterns.filter((item) => item !== pattern))}><X size={14} strokeWidth={2} /></Button>
                       </Chip>
                     ))}
                     <input ref={ruleInputRef} aria-label="添加域名规则" className="min-w-40 flex-1 bg-transparent text-sm outline-none" placeholder="输入域名" value={ruleInput} onChange={(event) => { setRuleInput(event.target.value); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addRule(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
