@@ -28,7 +28,7 @@ export function OptionsApp() {
     });
   }, []);
 
-  const ruleError = Boolean(error?.startsWith('域名') || error === pasteError);
+  const ruleError = Boolean(error && (error.startsWith('域名') || error === pasteError));
   const nameError = error === '请输入分组名称。' || error === '分组名称不能重复。';
   const patterns = splitPatterns(draft.patterns);
 
