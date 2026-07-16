@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LazyTabs 图标方案</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, system-ui, sans-serif; background: #f8f9fa; color: #202124; }
+    body { margin: 0; padding: 48px 24px; }
+    main { max-width: 960px; margin: auto; }
+    h1 { margin: 0; font-size: 32px; }
+    p { color: #5f6368; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 32px; }
+    article { display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: center; padding: 20px; background: #fff; border: 1px solid #dadce0; border-radius: 8px; }
+    img { width: 96px; height: 96px; }
+    h2 { margin: 0; font-size: 16px; }
+    .selected { border: 2px solid #1a73e8; }
+    .selected h2::after { content: ' 已采用'; color: #1a73e8; font-size: 13px; font-weight: 500; }
+    @media (prefers-color-scheme: dark) { :root { background: #202124; color: #e8eaed; } article { background: #292a2d; border-color: #5f6368; } p { color: #bdc1c6; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>LazyTabs</h1>
+    <p>Chrome 标签页自动分组。六个方向均保留 Google 蓝和小尺寸可读性；第一个方案已导出为扩展图标。</p>
+    <section class="grid">
+      <article class="selected"><img src="logo-variants/01-stacked-tabs.svg" alt="叠放标签页"><div><h2>叠放标签页</h2><p>两层标签页与内容行，直接表达自动收纳。</p></div></article>
+      <article><img src="logo-variants/02-tab-grid.svg" alt="标签网格"><div><h2>标签网格</h2><p>模块化排列，强调规则化整理。</p></div></article>
+      <article><img src="logo-variants/03-grouped-columns.svg" alt="分组列"><div><h2>分组列</h2><p>单列聚合与卡片组并置，突出分组。</p></div></article>
+      <article><img src="logo-variants/04-cascade.svg" alt="层叠标签"><div><h2>层叠标签</h2><p>最抽象的层叠关系，视觉更轻。</p></div></article>
+      <article><img src="logo-variants/05-tab-cluster.svg" alt="标签集群"><div><h2>标签集群</h2><p>连接节点表示按规则归类。</p></div></article>
+      <article><img src="logo-variants/06-tab-flow.svg" alt="标签流"><div><h2>标签流</h2><p>内容向组汇聚，传达自动化过程。</p></div></article>
+    </section>
+  </main>
+</body>
+</html>
