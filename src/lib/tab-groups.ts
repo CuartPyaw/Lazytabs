@@ -1,4 +1,4 @@
-import { matchingRule, type GroupColor } from './rules';
+import { matchingGroup, type GroupColor } from './rules';
 import { getSettings } from './settings';
 
 const pendingGroups = new Map<string, Promise<number>>();
@@ -47,10 +47,10 @@ export async function groupTab(tabId: number) {
   if (tab.pinned || tab.incognito) return false;
 
   const host = hostname(tab.url);
-  const rule = host ? matchingRule(host, settings.rules) : undefined;
-  if (!rule || tab.windowId === undefined) return false;
+  const group = host ? matchingGroup(host, settings.groups) : undefined;
+  if (!group || tab.windowId === undefined) return false;
 
-  await moveToGroup(tabId, tab.windowId, rule.groupName, rule.color);
+  await moveToGroup(tabId, tab.windowId, group.name, group.color);
 
   return true;
 }

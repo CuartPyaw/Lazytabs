@@ -11,7 +11,7 @@ describe('tab groups', () => {
   beforeEach(() => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
-      rules: [{ id: 'video', pattern: 'youtube.com', groupName: '视频', color: 'blue', enabled: true }],
+      groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
   });
 

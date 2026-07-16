@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findRuleConflict, matchesHost, matchingRule, normalizePattern, patternsOverlap, validatePattern, validateRule } from '../src/lib/rules';
+import { findRuleConflict, matchesHost, matchingGroup, normalizePattern, patternsOverlap, splitPatterns, validateGroup, validatePattern } from '../src/lib/rules';
 
 describe('domain rules', () => {
   it('normalizes patterns before they are validated or matched', () => {
@@ -15,46 +15,28 @@ describe('domain rules', () => {
     expect(matchesHost('api.github.com', 'github.com')).toBe(false);
   });
 
-  it('only accepts exact domains and left-side subdomain wildcards', () => {
-    const input = { groupName: 'code', color: 'blue' as const, enabled: true };
-
+  it('accepts a group with several valid domain rules', () => {
+    expect(splitPatterns('github.com\n*.github.com\ngithub.com')).toEqual(['github.com', '*.github.com']);
     expect(validatePattern('github.com')).toBeUndefined();
     expect(validatePattern('*.github.com')).toBeUndefined();
-    expect(validatePattern('*github.com')).toBeDefined();
-    expect(validateRule({ ...input, pattern: 'github.com' }, [])).toBeUndefined();
-    expect(validateRule({ ...input, pattern: '*.github.com' }, [])).toBeUndefined();
-    expect(validateRule({ ...input, pattern: '*github.com' }, [])).toBeDefined();
-    expect(validateRule({ ...input, pattern: 'git*hub.com' }, [])).toBeDefined();
+    expect(validateGroup({ name: '代码', color: 'blue', enabled: true, patterns: 'github.com\n*.github.com' }, [])).toBeUndefined();
+    expect(validateGroup({ name: '代码', color: 'blue', enabled: true, patterns: '*github.com' }, [])).toBeDefined();
   });
 
   it('rejects blank patterns and group names', () => {
-    expect(validateRule({ pattern: '', groupName: 'code', color: 'blue', enabled: true }, [])).toBe('域名通配符只能包含字母、数字、连字符、点和 *。');
-    expect(validateRule({ pattern: 'github.com', groupName: ' ', color: 'blue', enabled: true }, [])).toBe('请输入分组名称。');
+    expect(validateGroup({ name: '代码', color: 'blue', enabled: true, patterns: '' }, [])).toBe('域名通配符只能包含字母、数字、连字符、点和 *。');
+    expect(validateGroup({ name: ' ', color: 'blue', enabled: true, patterns: 'github.com' }, [])).toBe('请输入分组名称。');
   });
 
-  it('rejects overlapping enabled rules that send tabs to different groups', () => {
-    expect(
-      findRuleConflict(
-        { id: 'new', pattern: 'api.github.com', groupName: 'work', color: 'green', enabled: true },
-        [{ id: 'code', pattern: '*.github.com', groupName: 'code', color: 'blue', enabled: true }],
-      ),
-    ).toBe('*.github.com');
+  it('rejects overlapping enabled rules in different groups', () => {
+    const groups = [{ id: 'code', name: '代码', color: 'blue' as const, enabled: true, rules: [{ id: 'github', pattern: '*.github.com' }] }];
+    expect(findRuleConflict({ id: 'work', name: '工作', color: 'green', enabled: true, patterns: 'api.github.com' }, groups)).toBe('*.github.com');
   });
 
-  it('allows overlaps that lead to the same group and color', () => {
-    const existing = [{ id: 'code', pattern: '*.github.com', groupName: 'code', color: 'blue' as const, enabled: true }];
-
-    expect(findRuleConflict({ id: 'new', pattern: 'api.github.com', groupName: 'code', color: 'blue', enabled: true }, existing)).toBeUndefined();
-    expect(validateRule({ pattern: 'api.github.com', groupName: 'code', color: 'blue', enabled: true }, existing)).toBeUndefined();
-    expect(validateRule({ pattern: 'api.github.com', groupName: 'code', color: 'green', enabled: true }, existing)).toBeDefined();
-  });
-
-  it('ignores disabled rules when matching and finding conflicts', () => {
-    const disabledRule = { id: 'code', pattern: '*.github.com', groupName: 'code', color: 'blue' as const, enabled: false };
-
-    expect(matchingRule('api.github.com', [disabledRule])).toBeUndefined();
-    expect(findRuleConflict({ id: 'new', pattern: 'api.github.com', groupName: 'work', color: 'green', enabled: true }, [disabledRule])).toBeUndefined();
-    expect(findRuleConflict({ id: 'new', pattern: 'api.github.com', groupName: 'work', color: 'green', enabled: false }, [{ ...disabledRule, enabled: true }])).toBeUndefined();
+  it('matches a group when any of its rules matches', () => {
+    const groups = [{ id: 'code', name: '代码', color: 'blue' as const, enabled: true, rules: [{ id: 'github', pattern: 'github.com' }, { id: 'gitlab', pattern: 'gitlab.com' }] }];
+    expect(matchingGroup('gitlab.com', groups)?.name).toBe('代码');
+    expect(matchingGroup('github.com', [{ ...groups[0], enabled: false }])).toBeUndefined();
   });
 
   it('distinguishes overlapping wildcard patterns from separate domains', () => {

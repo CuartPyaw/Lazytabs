@@ -5,18 +5,30 @@ export type GroupColor = (typeof GROUP_COLORS)[number];
 export type Rule = {
   id: string;
   pattern: string;
-  groupName: string;
-  color: GroupColor;
-  enabled: boolean;
 };
 
-export type RuleInput = Omit<Rule, 'id'> & { id?: string };
+export type Group = {
+  id: string;
+  name: string;
+  color: GroupColor;
+  enabled: boolean;
+  rules: Rule[];
+};
+
+export type GroupInput = Omit<Group, 'id' | 'rules'> & {
+  id?: string;
+  patterns: string;
+};
 
 const wildcardPattern = /^[a-z0-9*.-]+$/i;
 const domainPattern = /^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
 export function normalizePattern(pattern: string) {
   return pattern.trim().toLowerCase().replace(/\.$/, '');
+}
+
+export function splitPatterns(value: string) {
+  return [...new Set(value.split(/\r?\n/).map(normalizePattern).filter(Boolean))];
 }
 
 export function validatePattern(value: string) {
@@ -46,32 +58,26 @@ export function patternsOverlap(first: string, second: string) {
   return false;
 }
 
-export function findRuleConflict(candidate: RuleInput, rules: Rule[]) {
+export function findRuleConflict(candidate: GroupInput, groups: Group[]) {
   if (!candidate.enabled) return undefined;
 
-  return rules.find((rule) =>
-    rule.enabled &&
-    rule.id !== candidate.id &&
-    rule.groupName.trim() !== candidate.groupName.trim() &&
-    patternsOverlap(rule.pattern, candidate.pattern),
-  )?.pattern;
+  return groups
+    .filter((group) => group.enabled && group.id !== candidate.id)
+    .flatMap((group) => group.rules)
+    .find((rule) => splitPatterns(candidate.patterns).some((pattern) => patternsOverlap(rule.pattern, pattern)))?.pattern;
 }
 
-export function validateRule(candidate: RuleInput, rules: Rule[]) {
-  const pattern = normalizePattern(candidate.pattern);
-  const groupName = candidate.groupName.trim();
-
-  const patternError = validatePattern(pattern);
+export function validateGroup(candidate: GroupInput, groups: Group[]) {
+  const patterns = splitPatterns(candidate.patterns);
+  const patternError = patterns.map(validatePattern).find(Boolean) ?? (patterns.length ? undefined : validatePattern(''));
   if (patternError) return patternError;
-  if (!groupName) return '请输入分组名称。';
-  if (candidate.enabled && rules.some((rule) => rule.enabled && rule.id !== candidate.id && rule.groupName.trim() === groupName && rule.color !== candidate.color)) {
-    return '同名目标分组必须使用相同颜色。';
-  }
+  if (!candidate.name.trim()) return '请输入分组名称。';
+  if (groups.some((group) => group.id !== candidate.id && group.name.trim() === candidate.name.trim())) return '分组名称不能重复。';
 
-  const conflict = findRuleConflict({ ...candidate, pattern, groupName }, rules);
+  const conflict = findRuleConflict(candidate, groups);
   return conflict ? `规则冲突：该模式会与 ${conflict} 同时匹配。` : undefined;
 }
 
-export function matchingRule(host: string, rules: Rule[]) {
-  return rules.find((rule) => rule.enabled && matchesHost(host, rule.pattern));
+export function matchingGroup(host: string, groups: Group[]) {
+  return groups.find((group) => group.enabled && group.rules.some((rule) => matchesHost(host, rule.pattern)));
 }
