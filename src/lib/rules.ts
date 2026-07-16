@@ -19,6 +19,13 @@ export function normalizePattern(pattern: string) {
   return pattern.trim().toLowerCase().replace(/\.$/, '');
 }
 
+export function validatePattern(value: string) {
+  const pattern = normalizePattern(value);
+
+  if (!pattern || !wildcardPattern.test(pattern)) return '域名通配符只能包含字母、数字、连字符、点和 *。';
+  if (!domainPattern.test(pattern)) return '域名规则必须是完整域名，或以 *. 开头的子域名通配符。';
+}
+
 export function matchesHost(host: string, pattern: string) {
   const normalized = normalizePattern(pattern);
   const normalizedHost = normalizePattern(host);
@@ -54,8 +61,8 @@ export function validateRule(candidate: RuleInput, rules: Rule[]) {
   const pattern = normalizePattern(candidate.pattern);
   const groupName = candidate.groupName.trim();
 
-  if (!pattern || !wildcardPattern.test(pattern)) return '域名通配符只能包含字母、数字、连字符、点和 *。';
-  if (!domainPattern.test(pattern)) return '域名规则必须是完整域名，或以 *. 开头的子域名通配符。';
+  const patternError = validatePattern(pattern);
+  if (patternError) return patternError;
   if (!groupName) return '请输入分组名称。';
   if (candidate.enabled && rules.some((rule) => rule.enabled && rule.id !== candidate.id && rule.groupName.trim() === groupName && rule.color !== candidate.color)) {
     return '同名目标分组必须使用相同颜色。';

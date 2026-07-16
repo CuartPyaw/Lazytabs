@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findRuleConflict, matchesHost, matchingRule, normalizePattern, patternsOverlap, validateRule } from '../src/lib/rules';
+import { findRuleConflict, matchesHost, matchingRule, normalizePattern, patternsOverlap, validatePattern, validateRule } from '../src/lib/rules';
 
 describe('domain rules', () => {
   it('normalizes patterns before they are validated or matched', () => {
@@ -18,6 +18,9 @@ describe('domain rules', () => {
   it('only accepts exact domains and left-side subdomain wildcards', () => {
     const input = { groupName: 'code', color: 'blue' as const, enabled: true };
 
+    expect(validatePattern('github.com')).toBeUndefined();
+    expect(validatePattern('*.github.com')).toBeUndefined();
+    expect(validatePattern('*github.com')).toBeDefined();
     expect(validateRule({ ...input, pattern: 'github.com' }, [])).toBeUndefined();
     expect(validateRule({ ...input, pattern: '*.github.com' }, [])).toBeUndefined();
     expect(validateRule({ ...input, pattern: '*github.com' }, [])).toBeDefined();

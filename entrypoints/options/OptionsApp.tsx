@@ -2,7 +2,7 @@ import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { GROUP_COLORS, type GroupColor, type Rule, type RuleInput, validateRule } from '../../src/lib/rules';
+import { GROUP_COLORS, type GroupColor, type Rule, type RuleInput, validatePattern, validateRule } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings } from '../../src/lib/settings';
 
 const emptyRule: RuleInput = { pattern: '', groupName: '', color: 'blue', enabled: true };
@@ -26,6 +26,7 @@ export function OptionsApp() {
   }, []);
 
   const error = useMemo(() => validateRule(draft, settings.rules), [draft, settings.rules]);
+  const patternError = draft.pattern ? validatePattern(draft.pattern) : undefined;
 
   async function updateSettings(next: Settings) {
     setSettings(next);
@@ -156,8 +157,8 @@ export function OptionsApp() {
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveRule(); }}>
                 <div className="grid items-start gap-5 md:grid-cols-2">
                   <label className="grid gap-2 text-sm font-medium">域名通配符
-                    <Input aria-invalid={Boolean(error)} value={draft.pattern} onChange={(event) => setDraft({ ...draft, pattern: event.target.value })} placeholder="*.github.com" />
-                    {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                    <Input aria-invalid={Boolean(patternError)} value={draft.pattern} onChange={(event) => setDraft({ ...draft, pattern: event.target.value })} placeholder="*.github.com" />
+                    {patternError && <span className="text-sm font-normal text-danger">{patternError}</span>}
                   </label>
                   <label className="grid gap-2 text-sm font-medium">分组名称
                     <Input value={draft.groupName} onChange={(event) => setDraft({ ...draft, groupName: event.target.value })} placeholder="代码" />
