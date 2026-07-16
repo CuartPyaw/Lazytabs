@@ -14,10 +14,9 @@ body {
 button { font: inherit; }
 
 .icon-button { display: inline-flex; align-items: center; justify-content: center; }
-.color-palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.color-choice { width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
-.color-choice::before { content: ""; display: block; width: 16px; height: 16px; margin: auto; border-radius: 5px; background: var(--group-color); }
-.color-choice[data-selected="true"] { box-shadow: 0 0 0 2px var(--group-color); background: color-mix(in srgb, var(--group-color) 20%, transparent); }
+.color-palette { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; width: max-content; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--foreground) 6%, transparent); }
+.color-choice { width: 32px; height: 32px; border: 0; border-radius: 4px; background: var(--group-color); cursor: pointer; }
+.color-choice[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--background), inset 0 0 0 4px var(--foreground); }
 .group-swatch { background: var(--group-color); }
 .color-grey { --group-color: #5f6368; }
 .color-blue { --group-color: #1a73e8; }

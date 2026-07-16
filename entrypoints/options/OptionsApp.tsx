@@ -2,10 +2,11 @@ import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { GROUP_COLORS, type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
+import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings } from '../../src/lib/settings';
 
 const emptyGroup: GroupInput = { name: '', patterns: '', color: 'blue', enabled: true };
+const paletteColors: GroupColor[] = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink', 'grey'];
 
 function nextId() {
   return crypto.randomUUID();
@@ -213,7 +214,7 @@ export function OptionsApp() {
                 <fieldset className="m-0 grid gap-2 border-0 p-0">
                   <legend className="p-0 text-sm font-medium">标签组颜色</legend>
                   <div className="color-palette" aria-label="标签组颜色">
-                    {GROUP_COLORS.map((color) => (
+                    {paletteColors.map((color) => (
                       <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color: color as GroupColor }); setError(undefined); }} />
                     ))}
                   </div>
