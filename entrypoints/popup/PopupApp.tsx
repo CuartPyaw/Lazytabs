@@ -7,6 +7,8 @@ type PopupState = { enabled: boolean; ruleCount: number; tabCount: number };
 export function PopupApp() {
   const [state, setState] = useState<PopupState>();
   const [grouped, setGrouped] = useState<number>();
+  const [organizeError, setOrganizeError] = useState<string>();
+  const [isOrganizing, setIsOrganizing] = useState(false);
   const isLoading = state === undefined;
 
   useEffect(() => {
@@ -14,8 +16,17 @@ export function PopupApp() {
   }, []);
 
   async function organize() {
-    const result = await chrome.runtime.sendMessage({ type: 'organize-current-window' });
-    setGrouped(result.grouped);
+    setIsOrganizing(true);
+    setOrganizeError(undefined);
+
+    try {
+      const result = await chrome.runtime.sendMessage({ type: 'organize-current-window' });
+      setGrouped(result.grouped);
+    } catch {
+      setOrganizeError('整理失败，请重试。');
+    } finally {
+      setIsOrganizing(false);
+    }
   }
 
   return (
@@ -45,12 +56,12 @@ export function PopupApp() {
       </section>
 
       <section className="px-5 pb-5 pt-4">
-        <Button fullWidth size="lg" onPress={organize}>
-          <FolderInput size={18} strokeWidth={1.9} /> 整理当前窗口
+        <Button fullWidth isDisabled={isLoading || isOrganizing} size="lg" onPress={organize}>
+          <FolderInput size={18} strokeWidth={1.9} /> {isOrganizing ? '正在整理...' : '整理当前窗口'}
         </Button>
         <div className="mt-4 flex items-center gap-2 text-sm text-muted">
           <span className="grid size-5 place-items-center rounded-full bg-success/15 text-success"><Check size={13} strokeWidth={2.4} /></span>
-          {grouped === undefined ? (state?.enabled ? '新打开的标签页会自动分组' : '自动分组当前已暂停') : `已整理 ${grouped} 个标签页`}
+          {organizeError ?? (grouped === undefined ? (state?.enabled ? '新打开的标签页会自动分组' : '自动分组当前已暂停') : `已整理 ${grouped} 个标签页`)}
         </div>
       </section>
     </main>
