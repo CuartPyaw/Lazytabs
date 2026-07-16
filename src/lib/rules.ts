@@ -13,6 +13,7 @@ export type Rule = {
 export type RuleInput = Omit<Rule, 'id'> & { id?: string };
 
 const wildcardPattern = /^[a-z0-9*.-]+$/i;
+const domainPattern = /^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
 export function normalizePattern(pattern: string) {
   return pattern.trim().toLowerCase().replace(/\.$/, '');
@@ -20,40 +21,21 @@ export function normalizePattern(pattern: string) {
 
 export function matchesHost(host: string, pattern: string) {
   const normalized = normalizePattern(pattern);
-  const expression = normalized
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*');
+  const normalizedHost = normalizePattern(host);
 
-  return new RegExp(`^${expression}$`, 'i').test(host.toLowerCase());
+  if (!normalized.startsWith('*.')) return normalizedHost === normalized;
+
+  const domain = normalized.slice(2);
+  return normalizedHost.endsWith(`.${domain}`) && normalizedHost.split('.').length === domain.split('.').length + 1;
 }
 
 export function patternsOverlap(first: string, second: string) {
   const left = normalizePattern(first);
   const right = normalizePattern(second);
-  const queue: Array<[number, number]> = [[0, 0]];
-  const seen = new Set<string>();
 
-  while (queue.length > 0) {
-    const [leftIndex, rightIndex] = queue.shift()!;
-    const key = `${leftIndex}:${rightIndex}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    if (leftIndex === left.length && rightIndex === right.length) return true;
-    const leftChar = left[leftIndex];
-    const rightChar = right[rightIndex];
-
-    if (leftChar === '*') queue.push([leftIndex + 1, rightIndex]);
-    if (rightChar === '*') queue.push([leftIndex, rightIndex + 1]);
-    if (!leftChar || !rightChar) continue;
-
-    const compatible = leftChar === '*' || rightChar === '*' || leftChar === rightChar;
-    if (compatible) {
-      queue.push([leftChar === '*' ? leftIndex : leftIndex + 1, rightChar === '*' ? rightIndex : rightIndex + 1]);
-    }
-  }
-
+  if (left === right) return true;
+  if (left.startsWith('*.')) return matchesHost(right, left);
+  if (right.startsWith('*.')) return matchesHost(left, right);
   return false;
 }
 
@@ -73,6 +55,7 @@ export function validateRule(candidate: RuleInput, rules: Rule[]) {
   const groupName = candidate.groupName.trim();
 
   if (!pattern || !wildcardPattern.test(pattern)) return '域名通配符只能包含字母、数字、连字符、点和 *。';
+  if (!domainPattern.test(pattern)) return '域名规则必须是完整域名，或以 *. 开头的子域名通配符。';
   if (!groupName) return '请输入分组名称。';
   if (candidate.enabled && rules.some((rule) => rule.enabled && rule.id !== candidate.id && rule.groupName.trim() === groupName && rule.color !== candidate.color)) {
     return '同名目标分组必须使用相同颜色。';
