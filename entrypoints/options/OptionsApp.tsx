@@ -151,22 +151,16 @@ export function OptionsApp() {
 
           {editorOpen && <Card>
             <Card.Header>
-              <div>
-                <Card.Title>{editingId ? '编辑分组' : '添加分组'}</Card.Title>
-                <Card.Description>每行一条完整域名或一层子域名通配符。</Card.Description>
-              </div>
+              <label className="flex items-center gap-2 text-sm font-medium">分组名称：
+                <Input className="w-64" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="代码" />
+              </label>
             </Card.Header>
             <Card.Content>
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                <div className="grid items-start gap-5 md:grid-cols-2">
-                  <label className="grid gap-2 text-sm font-medium">分组名称
-                    <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="代码" />
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium">域名规则
-                    <textarea aria-invalid={Boolean(error)} className="min-h-32 w-full rounded-lg border border-default bg-surface px-3 py-2 text-sm outline-none" value={draft.patterns} onChange={(event) => setDraft({ ...draft, patterns: event.target.value })} placeholder={'github.com\n*.github.com'} />
-                    {error && <span className="text-sm font-normal text-danger">{error}</span>}
-                  </label>
-                </div>
+                <label className="grid gap-2 text-sm font-medium">域名规则
+                  <textarea aria-invalid={Boolean(error)} className="min-h-32 w-full rounded-lg border border-default bg-surface px-3 py-2 text-sm outline-none" value={draft.patterns} onChange={(event) => setDraft({ ...draft, patterns: event.target.value })} placeholder={'github.com\n*.github.com'} />
+                  {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                </label>
                 <fieldset className="m-0 grid gap-2 border-0 p-0">
                   <legend className="p-0 text-sm font-medium">标签组颜色</legend>
                   <div className="color-palette" aria-label="标签组颜色">
