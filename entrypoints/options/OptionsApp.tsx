@@ -1,6 +1,6 @@
 import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { GROUP_COLORS, type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings } from '../../src/lib/settings';
@@ -17,10 +17,8 @@ export function OptionsApp() {
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [ruleInput, setRuleInput] = useState('');
-  const [editingRule, setEditingRule] = useState<{ pattern: string; value: string }>();
+  const [editingRule, setEditingRule] = useState<{ pattern?: string; value: string }>();
   const [pasteError, setPasteError] = useState<string>();
-  const ruleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void getSettings().then((value) => {
@@ -30,7 +28,7 @@ export function OptionsApp() {
   }, []);
 
   const groupError = useMemo(() => validateGroup(draft, settings.groups), [draft, settings.groups]);
-  const ruleError = pasteError ?? (editingRule ? validatePattern(editingRule.value) : ruleInput ? validatePattern(ruleInput) : undefined);
+  const ruleError = pasteError ?? (editingRule?.value ? validatePattern(editingRule.value) : undefined);
   const error = ruleError ?? groupError;
   const patterns = splitPatterns(draft.patterns);
 
@@ -51,7 +49,6 @@ export function OptionsApp() {
     setDraft({ ...group, patterns: group.rules.map((rule) => rule.pattern).join('\n') });
     setEditingId(group.id);
     setEditorOpen(true);
-    setRuleInput('');
     setEditingRule(undefined);
     setPasteError(undefined);
   }
@@ -60,7 +57,6 @@ export function OptionsApp() {
     setDraft(emptyGroup);
     setEditingId(undefined);
     setEditorOpen(true);
-    setRuleInput('');
     setEditingRule(undefined);
     setPasteError(undefined);
   }
@@ -74,7 +70,6 @@ export function OptionsApp() {
     setEditingId(undefined);
     setDraft(emptyGroup);
     setEditorOpen(false);
-    setRuleInput('');
     setEditingRule(undefined);
     setPasteError(undefined);
   }
@@ -83,17 +78,14 @@ export function OptionsApp() {
     setDraft({ ...draft, patterns: splitPatterns(nextPatterns.join('\n')).join('\n') });
   }
 
-  function addRule() {
-    if (!ruleInput.trim() || validatePattern(ruleInput)) return;
-    setPatterns([...patterns, ruleInput]);
-    setRuleInput('');
+  function beginAddRule() {
+    setEditingRule({ value: '' });
     setPasteError(undefined);
-    ruleInputRef.current?.focus();
   }
 
   function saveRuleEdit() {
     if (!editingRule || validatePattern(editingRule.value)) return;
-    setPatterns(patterns.map((pattern) => pattern === editingRule.pattern ? editingRule.value : pattern));
+    setPatterns(editingRule.pattern ? patterns.map((pattern) => pattern === editingRule.pattern ? editingRule.value : pattern) : [...patterns, editingRule.value]);
     setEditingRule(undefined);
   }
 
@@ -193,17 +185,21 @@ export function OptionsApp() {
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
                 <div className="grid gap-2 text-sm font-medium">
                   <span id="domain-rules-label">域名规则</span>
-                  <div aria-invalid={Boolean(ruleError)} aria-labelledby="domain-rules-label" className={`flex min-h-12 flex-wrap items-center gap-2 rounded-lg border bg-surface px-3 py-2 ${ruleError ? 'border-danger' : 'border-default'}`} role="list">
+                  <div aria-invalid={Boolean(ruleError)} aria-labelledby="domain-rules-label" className="flex flex-wrap items-center gap-2" role="list">
                     {patterns.map((pattern) => editingRule?.pattern === pattern ? (
-                      <input autoFocus aria-label={`编辑 ${pattern}`} className="min-w-40 flex-1 bg-transparent text-sm outline-none" key={pattern} value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} />
+                      <Chip className={`border bg-surface px-2.5 py-1.5 shadow-sm ${ruleError ? 'border-danger' : 'border-default/80'}`} key={pattern} variant="soft" role="listitem">
+                        <input autoFocus aria-label={`编辑 ${pattern}`} className="min-w-32 bg-transparent text-sm outline-none" value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
+                      </Chip>
                     ) : (
                       <Chip className="gap-1.5 border border-default/80 bg-surface px-2.5 py-1.5 text-sm shadow-sm" key={pattern} variant="soft" role="listitem">
                         <button aria-label={`编辑 ${pattern}`} className="border-0 bg-transparent p-0 text-left text-inherit" type="button" onClick={() => { setEditingRule({ pattern, value: pattern }); setPasteError(undefined); }}>{pattern}</button>
                         <Button isIconOnly aria-label={`删除 ${pattern}`} className="size-5 min-h-5 min-w-5 text-inherit" size="sm" variant="tertiary" onPress={() => setPatterns(patterns.filter((item) => item !== pattern))}><X size={14} strokeWidth={2} /></Button>
                       </Chip>
                     ))}
-                    <input ref={ruleInputRef} aria-label="添加域名规则" className="min-w-40 flex-1 bg-transparent text-sm outline-none" placeholder="输入域名" value={ruleInput} onChange={(event) => { setRuleInput(event.target.value); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addRule(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
-                    <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={addRule}><Plus size={16} strokeWidth={2} /></Button>
+                    {editingRule && !editingRule.pattern && <Chip className={`border bg-surface px-2.5 py-1.5 shadow-sm ${ruleError ? 'border-danger' : 'border-default/80'}`} variant="soft" role="listitem">
+                      <input autoFocus aria-label="添加域名规则" className="min-w-32 bg-transparent text-sm outline-none" placeholder="输入域名" value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
+                    </Chip>}
+                    <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={beginAddRule}><Plus size={16} strokeWidth={2} /></Button>
                   </div>
                   {error && <span className="text-sm font-normal text-danger">{error}</span>}
                 </div>
