@@ -9,7 +9,6 @@ export default defineConfig({
     description: 'Automatically group Chrome tabs by domain rules.',
     permissions: ['storage', 'tabs', 'tabGroups'],
     action: { default_title: 'LazyTabs' },
-    options_ui: { page: 'options.html', open_in_tab: true },
   },
   vite: () => ({ plugins: [tailwindcss()] }),
 });
