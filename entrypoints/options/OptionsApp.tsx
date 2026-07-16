@@ -1,8 +1,8 @@
 import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { GROUP_COLORS, type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup } from '../../src/lib/rules';
+import { GROUP_COLORS, type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings } from '../../src/lib/settings';
 
 const emptyGroup: GroupInput = { name: '', patterns: '', color: 'blue', enabled: true };
@@ -17,6 +17,10 @@ export function OptionsApp() {
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [ruleInput, setRuleInput] = useState('');
+  const [editingRule, setEditingRule] = useState<{ pattern: string; value: string }>();
+  const [pasteError, setPasteError] = useState<string>();
+  const ruleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void getSettings().then((value) => {
@@ -25,7 +29,10 @@ export function OptionsApp() {
     });
   }, []);
 
-  const error = useMemo(() => validateGroup(draft, settings.groups), [draft, settings.groups]);
+  const groupError = useMemo(() => validateGroup(draft, settings.groups), [draft, settings.groups]);
+  const ruleError = pasteError ?? (editingRule ? validatePattern(editingRule.value) : ruleInput ? validatePattern(ruleInput) : undefined);
+  const error = ruleError ?? groupError;
+  const patterns = splitPatterns(draft.patterns);
 
   async function updateSettings(next: Settings) {
     setSettings(next);
@@ -44,12 +51,18 @@ export function OptionsApp() {
     setDraft({ ...group, patterns: group.rules.map((rule) => rule.pattern).join('\n') });
     setEditingId(group.id);
     setEditorOpen(true);
+    setRuleInput('');
+    setEditingRule(undefined);
+    setPasteError(undefined);
   }
 
   function beginCreate() {
     setDraft(emptyGroup);
     setEditingId(undefined);
     setEditorOpen(true);
+    setRuleInput('');
+    setEditingRule(undefined);
+    setPasteError(undefined);
   }
 
   async function removeGroup(id: string) {
@@ -61,6 +74,27 @@ export function OptionsApp() {
     setEditingId(undefined);
     setDraft(emptyGroup);
     setEditorOpen(false);
+    setRuleInput('');
+    setEditingRule(undefined);
+    setPasteError(undefined);
+  }
+
+  function setPatterns(nextPatterns: string[]) {
+    setDraft({ ...draft, patterns: splitPatterns(nextPatterns.join('\n')).join('\n') });
+  }
+
+  function addRule() {
+    if (!ruleInput.trim() || validatePattern(ruleInput)) return;
+    setPatterns([...patterns, ruleInput]);
+    setRuleInput('');
+    setPasteError(undefined);
+    ruleInputRef.current?.focus();
+  }
+
+  function saveRuleEdit() {
+    if (!editingRule || validatePattern(editingRule.value)) return;
+    setPatterns(patterns.map((pattern) => pattern === editingRule.pattern ? editingRule.value : pattern));
+    setEditingRule(undefined);
   }
 
   async function saveGroup() {
@@ -157,10 +191,22 @@ export function OptionsApp() {
             </Card.Header>
             <Card.Content>
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                <label className="grid gap-2 text-sm font-medium">域名规则
-                  <textarea aria-invalid={Boolean(error)} className="min-h-32 w-full rounded-lg border border-default bg-surface px-3 py-2 text-sm outline-none" value={draft.patterns} onChange={(event) => setDraft({ ...draft, patterns: event.target.value })} placeholder={'github.com\n*.github.com'} />
+                <div className="grid gap-2 text-sm font-medium">
+                  <span id="domain-rules-label">域名规则</span>
+                  <div aria-invalid={Boolean(ruleError)} aria-labelledby="domain-rules-label" className={`flex min-h-12 flex-wrap items-center gap-2 rounded-lg border bg-surface px-3 py-2 ${ruleError ? 'border-danger' : 'border-default'}`} role="list">
+                    {patterns.map((pattern) => editingRule?.pattern === pattern ? (
+                      <input autoFocus aria-label={`编辑 ${pattern}`} className="min-w-40 flex-1 bg-transparent text-sm outline-none" key={pattern} value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} />
+                    ) : (
+                      <Chip className="gap-1" key={pattern} size="sm" variant="soft" role="listitem">
+                        <button aria-label={`编辑 ${pattern}`} className="border-0 bg-transparent p-0 text-left text-inherit" type="button" onClick={() => { setEditingRule({ pattern, value: pattern }); setPasteError(undefined); }}>{pattern}</button>
+                        <Button isIconOnly aria-label={`删除 ${pattern}`} className="size-4 min-h-4 min-w-4 text-inherit" size="sm" variant="tertiary" onPress={() => setPatterns(patterns.filter((item) => item !== pattern))}><X size={13} strokeWidth={2} /></Button>
+                      </Chip>
+                    ))}
+                    <input ref={ruleInputRef} aria-label="添加域名规则" className="min-w-40 flex-1 bg-transparent text-sm outline-none" placeholder="输入域名" value={ruleInput} onChange={(event) => { setRuleInput(event.target.value); setPasteError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addRule(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
+                    <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={addRule}><Plus size={16} strokeWidth={2} /></Button>
+                  </div>
                   {error && <span className="text-sm font-normal text-danger">{error}</span>}
-                </label>
+                </div>
                 <fieldset className="m-0 grid gap-2 border-0 p-0">
                   <legend className="p-0 text-sm font-medium">标签组颜色</legend>
                   <div className="color-palette" aria-label="标签组颜色">
