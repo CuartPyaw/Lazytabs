@@ -154,7 +154,7 @@ export function OptionsApp() {
             </Card.Header>
             <Card.Content>
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveRule(); }}>
-                <div className="grid gap-5 md:grid-cols-2">
+                <div className="grid items-start gap-5 md:grid-cols-2">
                   <label className="grid gap-2 text-sm font-medium">域名通配符
                     <Input aria-invalid={Boolean(error)} value={draft.pattern} onChange={(event) => setDraft({ ...draft, pattern: event.target.value })} placeholder="*.github.com" />
                     {error && <span className="text-sm font-normal text-danger">{error}</span>}
