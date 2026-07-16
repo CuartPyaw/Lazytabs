@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { GROUP_COLORS, type GroupColor, type Rule, type RuleInput, validatePattern, validateRule } from '../../src/lib/rules';
@@ -146,12 +146,11 @@ export function OptionsApp() {
           </Card>
 
           {editorOpen && <Card>
-            <Card.Header className="flex items-center justify-between gap-4">
+            <Card.Header>
               <div>
                 <Card.Title>{editingId ? '编辑规则' : '添加规则'}</Card.Title>
                 <Card.Description>使用完整域名或一层子域名通配符。</Card.Description>
               </div>
-              <Button isIconOnly aria-label="关闭编辑器" size="sm" variant="tertiary" onPress={cancelEdit}><X size={18} strokeWidth={1.8} /></Button>
             </Card.Header>
             <Card.Content>
               <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveRule(); }}>
