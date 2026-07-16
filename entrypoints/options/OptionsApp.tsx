@@ -123,7 +123,7 @@ export function OptionsApp() {
               <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
             </div>
           </div>
-          <Switch isSelected={settings.enabled} isDisabled={!loaded} onChange={setEnabled}>
+          <Switch className="soft-switch" isSelected={settings.enabled} isDisabled={!loaded} onChange={setEnabled}>
             <Switch.Control><Switch.Thumb /></Switch.Control>
             自动分组
           </Switch>
@@ -165,7 +165,7 @@ export function OptionsApp() {
               {loaded && settings.groups.length > 0 && <div className="divide-y divide-default border-y border-default">
                 {settings.groups.map((group) => (
                   <div className="flex min-h-20 flex-wrap items-center gap-4 py-3" key={group.id}>
-                    <Switch aria-label={`启用 ${group.name}`} isSelected={group.enabled} onChange={() => void toggleGroup(group)}>
+                    <Switch aria-label={`启用 ${group.name}`} className="soft-switch" isSelected={group.enabled} onChange={() => void toggleGroup(group)}>
                       <Switch.Control><Switch.Thumb /></Switch.Control>
                     </Switch>
                     <div className="min-w-48 flex-1">
