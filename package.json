@@ -19,9 +19,11 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "latest",
+    "@testing-library/react": "^16.3.2",
     "@types/chrome": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "happy-dom": "^20.10.6",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vitest": "latest"

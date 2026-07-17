@@ -27,23 +27,35 @@ export function OptionsApp() {
       setSettings(value);
       setLoaded(true);
     });
+
+    const handleSettingsChange = (changes: { settings?: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName !== 'local' || !changes.settings) return;
+
+      const nextSettings = changes.settings.newValue as Settings | undefined;
+      if (nextSettings?.groups) {
+        setSettings(nextSettings);
+      } else {
+        void getSettings().then(setSettings);
+      }
+    };
+    chrome.storage.onChanged.addListener(handleSettingsChange);
+
+    return () => chrome.storage.onChanged.removeListener(handleSettingsChange);
   }, []);
 
   const ruleError = Boolean(error && (error.startsWith('域名') || error === pasteError));
   const nameError = error === '请输入分组名称。' || error === '分组名称不能重复。';
   const patterns = splitPatterns(draft.patterns);
 
-  async function updateSettings(next: Settings) {
+  async function updateSettings(groups: Group[]) {
+    const currentSettings = await getSettings();
+    const next = { ...currentSettings, groups };
     setSettings(next);
     await saveSettings(next);
   }
 
-  async function setEnabled(enabled: boolean) {
-    await updateSettings({ ...settings, enabled });
-  }
-
   async function toggleGroup(group: Group) {
-    await updateSettings({ ...settings, groups: settings.groups.map((item) => item.id === group.id ? { ...item, enabled: !item.enabled } : item) });
+    await updateSettings(settings.groups.map((item) => item.id === group.id ? { ...item, enabled: !item.enabled } : item));
   }
 
   function beginEdit(group: Group) {
@@ -65,7 +77,7 @@ export function OptionsApp() {
   }
 
   async function removeGroup(id: string) {
-    await updateSettings({ ...settings, groups: settings.groups.filter((group) => group.id !== id) });
+    await updateSettings(settings.groups.filter((group) => group.id !== id));
     if (editingId === id) cancelEdit();
   }
 
@@ -108,7 +120,7 @@ export function OptionsApp() {
       rules: splitPatterns(draft.patterns).map((pattern) => existing?.rules.find((rule) => rule.pattern === pattern) ?? { id: nextId(), pattern }),
     };
     const groups = existing ? settings.groups.map((item) => item.id === group.id ? group : item) : [...settings.groups, group];
-    await updateSettings({ ...settings, groups });
+    await updateSettings(groups);
     cancelEdit();
   }
 
@@ -123,10 +135,6 @@ export function OptionsApp() {
               <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
             </div>
           </div>
-          <Switch className="soft-switch" isSelected={settings.enabled} isDisabled={!loaded} onChange={setEnabled}>
-            <Switch.Control><Switch.Thumb /></Switch.Control>
-            自动分组
-          </Switch>
         </div>
       </header>
 
@@ -166,7 +174,7 @@ export function OptionsApp() {
                 {settings.groups.map((group) => (
                   <div className="flex min-h-20 flex-wrap items-center gap-4 py-3" key={group.id}>
                     <Switch aria-label={`启用 ${group.name}`} className="soft-switch" isSelected={group.enabled} onChange={() => void toggleGroup(group)}>
-                      <Switch.Control><Switch.Thumb /></Switch.Control>
+                      <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
                     </Switch>
                     <div className="min-w-48 flex-1">
                       <p className="m-0 text-sm font-medium">{group.name}</p>

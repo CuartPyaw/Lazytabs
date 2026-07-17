@@ -1,4 +1,4 @@
-import { matchingGroup, type GroupColor } from './rules';
+import { matchingGroup, type Group, type GroupColor } from './rules';
 import { getSettings } from './settings';
 
 const pendingGroups = new Map<string, Promise<number>>();
@@ -39,15 +39,12 @@ async function moveToGroup(tabId: number, windowId: number, groupName: string, c
   }
 }
 
-export async function groupTab(tabId: number) {
-  const settings = await getSettings();
-  if (!settings.enabled) return false;
-
+async function groupTabWithGroups(tabId: number, groups: Group[]) {
   const tab = await chrome.tabs.get(tabId);
   if (tab.pinned || tab.incognito) return false;
 
   const host = hostname(tab.url);
-  const group = host ? matchingGroup(host, settings.groups) : undefined;
+  const group = host ? matchingGroup(host, groups) : undefined;
   if (!group || tab.windowId === undefined) return false;
 
   await moveToGroup(tabId, tab.windowId, group.name, group.color);
@@ -55,13 +52,21 @@ export async function groupTab(tabId: number) {
   return true;
 }
 
+export async function groupTab(tabId: number) {
+  const settings = await getSettings();
+  if (!settings.enabled) return false;
+
+  return groupTabWithGroups(tabId, settings.groups);
+}
+
 export async function organizeCurrentWindow() {
+  const settings = await getSettings();
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const tabIds = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
     .map((tab) => tab.id);
   const results = await Promise.allSettled(
-    tabIds.map((tabId) => groupTab(tabId)),
+    tabIds.map((tabId) => groupTabWithGroups(tabId, settings.groups)),
   );
   return results.filter((result) => result.status === 'fulfilled' && result.value).length;
 }
