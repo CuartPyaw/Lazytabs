@@ -3,6 +3,10 @@ import { getSettings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
 export default defineBackground(() => {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command === 'organize-current-window') void organizeCurrentWindow();
+  });
+
   chrome.tabs.onCreated.addListener((tab) => {
     if (tab.id !== undefined) void groupTab(tab.id);
   });
