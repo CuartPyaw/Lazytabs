@@ -1,5 +1,7 @@
 # LazyTabs
 
+[中文](README.md) | [English](README.en.md)
+
 ![LazyTabs 图标](public/icon/128.png)
 
 按域名规则自动整理 Chrome 标签页。
