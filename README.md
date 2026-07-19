@@ -100,3 +100,11 @@ npm run dev
 - `storage`：保存分组规则和启用状态
 - `tabs`：读取当前窗口标签页及其网址
 - `tabGroups`：创建、更新和复用 Chrome 标签组
+
+## 反馈
+
+有问题、建议或功能需求，请[提交 Issue](https://github.com/CuartPyaw/Lazytabs/issues)。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。

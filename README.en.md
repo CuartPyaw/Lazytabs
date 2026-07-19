@@ -91,3 +91,11 @@ The project is built with TypeScript, React, WXT, and HeroUI. Core rule and tab-
 - `storage`: store grouping rules and enabled states
 - `tabs`: read tabs in the current window and their URLs
 - `tabGroups`: create, update, and reuse Chrome tab groups
+
+## Feedback
+
+For bugs, suggestions, or feature requests, please [open an issue](https://github.com/CuartPyaw/Lazytabs/issues).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
