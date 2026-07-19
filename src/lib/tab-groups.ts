@@ -62,11 +62,17 @@ export async function groupTab(tabId: number) {
 export async function organizeCurrentWindow() {
   const settings = await getSettings();
   const tabs = await chrome.tabs.query({ currentWindow: true });
-  const tabIds = tabs
+  const eligibleTabs = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
-    .map((tab) => tab.id);
   const results = await Promise.allSettled(
-    tabIds.map((tabId) => groupTabWithGroups(tabId, settings.groups)),
+    eligibleTabs.map(async (tab) => {
+      const grouped = await groupTabWithGroups(tab.id, settings.groups);
+      if (!grouped && tab.groupId >= 0) {
+        await chrome.tabs.ungroup(tab.id);
+        return true;
+      }
+      return grouped;
+    }),
   );
   return results.filter((result) => result.status === 'fulfilled' && result.value).length;
 }

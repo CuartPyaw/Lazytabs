@@ -93,4 +93,25 @@ describe('tab groups', () => {
 
     await expect(organizeCurrentWindow()).resolves.toBe(1);
   });
+
+  it('removes non-matching tabs from existing groups', async () => {
+    const ungroup = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async () => ({ id: 1, url: 'https://example.com', windowId: 1 })),
+        group: vi.fn(),
+        query: vi.fn(async () => [{ id: 1, url: 'https://example.com', windowId: 1, groupId: 3 }]),
+        ungroup,
+      },
+      tabGroups: {
+        query: vi.fn(async () => []),
+        update: vi.fn(async () => undefined),
+      },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(1);
+
+    expect(ungroup).toHaveBeenCalledWith(1);
+  });
 });
