@@ -24,6 +24,7 @@ describe('settings', () => {
     await expect(getSettings()).resolves.toEqual({
       enabled: true,
       collapseGroups: true,
+      organizeAllWindows: false,
       theme: 'system',
       groups: [{
         id: 'github',

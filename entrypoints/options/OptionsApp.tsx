@@ -18,7 +18,7 @@ function nextId() {
 }
 
 export function OptionsApp() {
-  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, groups: [], theme: 'system' });
+  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -39,7 +39,7 @@ export function OptionsApp() {
       if (areaName !== 'local' || !changes.settings) return;
 
       const nextSettings = changes.settings.newValue as Settings | undefined;
-      if (nextSettings?.groups && nextSettings.theme && typeof nextSettings.collapseGroups === 'boolean') {
+      if (nextSettings?.groups && nextSettings.theme && typeof nextSettings.collapseGroups === 'boolean' && typeof nextSettings.organizeAllWindows === 'boolean') {
         setSettings(nextSettings);
       } else {
         void getSettings().then(setSettings);
@@ -75,6 +75,13 @@ export function OptionsApp() {
   async function updateCollapseGroups(collapseGroups: boolean) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, collapseGroups };
+    setSettings(next);
+    await saveSettings(next);
+  }
+
+  async function updateOrganizeAllWindows(organizeAllWindows: boolean) {
+    const currentSettings = await getSettings();
+    const next = { ...currentSettings, organizeAllWindows };
     setSettings(next);
     await saveSettings(next);
   }
@@ -194,6 +201,12 @@ export function OptionsApp() {
                 <Switch.Content>
                   <Switch.Control><Switch.Thumb /></Switch.Control>
                   整理后自动折叠
+                </Switch.Content>
+              </Switch>
+              <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}>
+                <Switch.Content>
+                  <Switch.Control><Switch.Thumb /></Switch.Control>
+                  整理全部窗口
                 </Switch.Content>
               </Switch>
             </Card.Content>

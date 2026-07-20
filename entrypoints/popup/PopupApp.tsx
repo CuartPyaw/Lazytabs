@@ -89,7 +89,7 @@ export function PopupApp() {
 
       <section className="px-5 pb-5 pt-4">
         <Button fullWidth isDisabled={isLoading || isOrganizing} size="lg" onPress={organize}>
-          <FolderInput size={18} strokeWidth={1.9} /> {isOrganizing ? '正在整理...' : '整理当前窗口'}
+          <FolderInput size={18} strokeWidth={1.9} /> {isOrganizing ? '正在整理...' : '整理标签页'}
         </Button>
         <div className="mt-4 flex items-center gap-2 text-sm text-muted">
           <span aria-label={organizeError ? '整理失败' : isPaused ? '自动分组已暂停' : '整理成功'} className={organizeError ? 'grid size-5 place-items-center rounded-full bg-danger/15 text-danger' : isPaused ? 'grid size-5 place-items-center rounded-full bg-default text-muted' : 'grid size-5 place-items-center rounded-full bg-success/15 text-success'}>

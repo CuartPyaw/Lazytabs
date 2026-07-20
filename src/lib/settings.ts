@@ -3,6 +3,7 @@ import type { Group, GroupColor, Rule } from './rules';
 export type Settings = {
   enabled: boolean;
   collapseGroups: boolean;
+  organizeAllWindows: boolean;
   groups: Group[];
   theme: Theme;
 };
@@ -16,7 +17,7 @@ type LegacyRule = Rule & {
 };
 
 const settingsKey = 'settings';
-const defaultSettings: Settings = { enabled: true, collapseGroups: true, groups: [], theme: 'system' };
+const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' };
 
 function migrateRules(rules: LegacyRule[]) {
   return rules.reduce<Group[]>((groups, rule) => {

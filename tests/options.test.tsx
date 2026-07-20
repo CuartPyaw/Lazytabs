@@ -8,6 +8,7 @@ import { OptionsApp } from '../entrypoints/options/OptionsApp';
 const storedSettings = {
   enabled: true,
   collapseGroups: true,
+  organizeAllWindows: false,
   theme: 'system' as const,
   groups: [
     {
@@ -75,6 +76,17 @@ describe('OptionsApp interactions', () => {
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, collapseGroups: false } });
+    });
+  });
+
+  it('persists all-window organization', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
+    fireEvent.click(await screen.findByRole('switch', { name: '整理全部窗口' }));
+
+    await waitFor(() => {
+      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, organizeAllWindows: true } });
     });
   });
 

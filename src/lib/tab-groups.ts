@@ -58,8 +58,16 @@ export async function groupTab(tabId: number) {
 }
 
 export async function organizeCurrentWindow() {
+  return organizeTabs({ currentWindow: true });
+}
+
+export async function organizeAllWindows() {
+  return organizeTabs({});
+}
+
+async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
   const settings = await getSettings();
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const tabs = await chrome.tabs.query(queryInfo);
   const eligibleTabs = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
   const updatedGroupIds = new Set<number>();

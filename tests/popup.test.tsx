@@ -8,6 +8,7 @@ import { PopupApp } from '../entrypoints/popup/PopupApp';
 const storedSettings = {
   enabled: true,
   collapseGroups: true,
+  organizeAllWindows: false,
   theme: 'system' as const,
   groups: [{ id: 'video', name: '视频', color: 'blue' as const, enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
 };
@@ -62,7 +63,7 @@ describe('PopupApp', () => {
     });
     render(<PopupApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '整理当前窗口' }));
+    fireEvent.click(await screen.findByRole('button', { name: '整理标签页' }));
 
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: 'organize-current-window' });

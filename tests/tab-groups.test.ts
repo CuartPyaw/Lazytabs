@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { organizeCurrentWindow } from '../src/lib/tab-groups';
+import { organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
 import { getSettings } from '../src/lib/settings';
 
 vi.mock('../src/lib/settings', () => ({ getSettings: vi.fn() }));
@@ -12,6 +12,7 @@ describe('tab groups', () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
       collapseGroups: true,
+      organizeAllWindows: false,
       theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
@@ -49,6 +50,7 @@ describe('tab groups', () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
       collapseGroups: true,
+      organizeAllWindows: false,
       theme: 'system',
       groups: [
         { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
@@ -81,6 +83,7 @@ describe('tab groups', () => {
     mockedGetSettings.mockResolvedValue({
       enabled: false,
       collapseGroups: false,
+      organizeAllWindows: false,
       theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
@@ -128,6 +131,7 @@ describe('tab groups', () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
       collapseGroups: true,
+      organizeAllWindows: false,
       theme: 'system',
       groups: [
         { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
@@ -155,5 +159,30 @@ describe('tab groups', () => {
 
     expect(update).toHaveBeenCalledWith(2, { collapsed: true });
     expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
+  });
+
+  it('organizes accessible tabs across all windows', async () => {
+    const group = vi.fn(async (options: chrome.tabs.GroupOptions) => 'createProperties' in options ? 1 : options.groupId);
+    const query = vi.fn(async () => [
+      { id: 1, url: 'https://youtube.com/watch', windowId: 1 },
+      { id: 2, url: 'https://youtube.com/watch', windowId: 2, incognito: true },
+    ]);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async (tabId: number) => ({ id: tabId, url: 'https://youtube.com/watch', windowId: 1 })),
+        group,
+        query,
+      },
+      tabGroups: {
+        query: vi.fn(async () => []),
+        update: vi.fn(async () => undefined),
+      },
+    });
+
+    await expect(organizeAllWindows()).resolves.toBe(1);
+
+    expect(query).toHaveBeenCalledWith({});
+    expect(group).toHaveBeenCalledTimes(1);
   });
 });

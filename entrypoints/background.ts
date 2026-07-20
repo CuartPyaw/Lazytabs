@@ -1,4 +1,4 @@
-import { groupTab, organizeCurrentWindow } from '../src/lib/tab-groups';
+import { groupTab, organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
 import { getSettings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
@@ -17,7 +17,9 @@ export default defineBackground(() => {
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'organize-current-window') {
-      void organizeCurrentWindow().then((grouped) => sendResponse({ grouped }));
+      void getSettings()
+        .then((settings) => settings.organizeAllWindows ? organizeAllWindows() : organizeCurrentWindow())
+        .then((grouped) => sendResponse({ grouped }));
       return true;
     }
 
