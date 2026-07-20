@@ -59,7 +59,8 @@ describe('OptionsApp interactions', () => {
 
     expect(screen.queryByLabelText('主题')).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
-    fireEvent.change(await screen.findByLabelText('主题'), { target: { value: 'dark' } });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } });

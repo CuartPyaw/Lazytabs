@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Input, Skeleton, Switch, useTheme } from '@heroui/react';
+import { Button, Card, Chip, Input, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -7,6 +7,11 @@ import { getSettings, saveSettings, type Settings, type Theme } from '../../src/
 
 const emptyGroup: GroupInput = { name: '', patterns: '', color: 'blue', enabled: true };
 const paletteColors: GroupColor[] = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink', 'grey'];
+const themeOptions: { value: Theme; label: string }[] = [
+  { value: 'system', label: '系统' },
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+];
 
 function nextId() {
   return crypto.randomUUID();
@@ -202,14 +207,22 @@ export function OptionsApp() {
               </div>
             </Card.Header>
             <Card.Content>
-              <label className="flex items-center gap-2 text-sm text-muted">
-                主题
-                <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
-                  <option value="system">跟随系统</option>
-                  <option value="light">浅色</option>
-                  <option value="dark">深色</option>
-                </select>
-              </label>
+              <RadioGroup aria-label="主题" className="grid max-w-lg grid-cols-3 gap-4" value={settings.theme} onChange={(theme) => void updateTheme(theme as Theme)}>
+                {themeOptions.map(({ value, label }) => (
+                  <Radio key={value} value={value}>
+                    <Radio.Content className={({ isSelected }) => `theme-choice ${isSelected ? 'theme-choice-selected' : ''}`}>
+                      <span aria-hidden="true" className={`theme-preview theme-preview-${value}`}>
+                        <span className="theme-preview-window">
+                          <span className="theme-preview-title" />
+                          <span className="theme-preview-line" />
+                          <span className="theme-preview-line theme-preview-line-short" />
+                        </span>
+                      </span>
+                      <span>{label}</span>
+                    </Radio.Content>
+                  </Radio>
+                ))}
+              </RadioGroup>
             </Card.Content>
           </Card>}
 
