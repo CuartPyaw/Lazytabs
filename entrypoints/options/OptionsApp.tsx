@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
+import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
@@ -21,7 +21,7 @@ export function OptionsApp() {
   const [editingRule, setEditingRule] = useState<{ pattern?: string; value: string }>();
   const [pasteError, setPasteError] = useState<string>();
   const [error, setError] = useState<string>();
-  const [activeSection, setActiveSection] = useState<'groups' | 'general'>('groups');
+  const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -169,6 +169,10 @@ export function OptionsApp() {
               <Settings2 size={17} strokeWidth={1.8} />
               通用
             </button>
+            <button aria-pressed={activeSection === 'appearance'} className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium ${activeSection === 'appearance' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-default'}`} type="button" onClick={() => setActiveSection('appearance')}>
+              <Palette size={17} strokeWidth={1.8} />
+              外观
+            </button>
           </div>
         </aside>
 
@@ -177,7 +181,7 @@ export function OptionsApp() {
             <Card.Header>
               <div>
                 <Card.Title>通用</Card.Title>
-                <Card.Description>调整标签页整理的默认行为和显示主题。</Card.Description>
+                <Card.Description>调整标签页整理的默认行为。</Card.Description>
               </div>
             </Card.Header>
             <Card.Content className="grid gap-5">
@@ -187,6 +191,17 @@ export function OptionsApp() {
                   整理后自动折叠
                 </Switch.Content>
               </Switch>
+            </Card.Content>
+          </Card>}
+
+          {activeSection === 'appearance' && <Card>
+            <Card.Header>
+              <div>
+                <Card.Title>外观</Card.Title>
+                <Card.Description>调整扩展的显示主题。</Card.Description>
+              </div>
+            </Card.Header>
+            <Card.Content>
               <label className="flex items-center gap-2 text-sm text-muted">
                 主题
                 <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>

@@ -58,7 +58,7 @@ describe('OptionsApp interactions', () => {
     render(<OptionsApp />);
 
     expect(screen.queryByLabelText('主题')).toBeNull();
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
+    fireEvent.click(await screen.findByRole('button', { name: '外观' }));
     fireEvent.change(await screen.findByLabelText('主题'), { target: { value: 'dark' } });
 
     await waitFor(() => {
