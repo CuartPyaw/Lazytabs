@@ -13,7 +13,7 @@ function nextId() {
 }
 
 export function OptionsApp() {
-  const [settings, setSettings] = useState<Settings>({ enabled: true, groups: [], theme: 'system' });
+  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -33,7 +33,7 @@ export function OptionsApp() {
       if (areaName !== 'local' || !changes.settings) return;
 
       const nextSettings = changes.settings.newValue as Settings | undefined;
-      if (nextSettings?.groups && nextSettings.theme) {
+      if (nextSettings?.groups && nextSettings.theme && typeof nextSettings.collapseGroups === 'boolean') {
         setSettings(nextSettings);
       } else {
         void getSettings().then(setSettings);
@@ -62,6 +62,13 @@ export function OptionsApp() {
   async function updateTheme(theme: Theme) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, theme };
+    setSettings(next);
+    await saveSettings(next);
+  }
+
+  async function updateCollapseGroups(collapseGroups: boolean) {
+    const currentSettings = await getSettings();
+    const next = { ...currentSettings, collapseGroups };
     setSettings(next);
     await saveSettings(next);
   }
@@ -139,7 +146,7 @@ export function OptionsApp() {
   return (
     <main className="min-h-[100dvh] bg-default/35 text-foreground">
       <header className="border-b border-default bg-surface">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6 px-6 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Layers3 size={21} strokeWidth={2} /></span>
             <div>
@@ -147,14 +154,22 @@ export function OptionsApp() {
               <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            主题
-            <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
-              <option value="system">跟随系统</option>
-              <option value="light">浅色</option>
-              <option value="dark">深色</option>
-            </select>
-          </label>
+          <div className="flex items-center gap-5">
+            <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}>
+              <Switch.Content>
+                <Switch.Control><Switch.Thumb /></Switch.Control>
+                整理后自动折叠
+              </Switch.Content>
+            </Switch>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              主题
+              <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
+                <option value="system">跟随系统</option>
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+              </select>
+            </label>
+          </div>
         </div>
       </header>
 

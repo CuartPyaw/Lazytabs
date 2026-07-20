@@ -14,7 +14,7 @@ async function moveToGroup(tabId: number, windowId: number, groupName: string, c
   const pendingGroup = pendingGroups.get(key);
   if (pendingGroup) {
     await chrome.tabs.group({ groupId: await pendingGroup, tabIds: [tabId] });
-    return;
+    return pendingGroup;
   }
 
   const groupId = (async () => {
@@ -33,7 +33,7 @@ async function moveToGroup(tabId: number, windowId: number, groupName: string, c
 
   pendingGroups.set(key, groupId);
   try {
-    await groupId;
+    return await groupId;
   } finally {
     pendingGroups.delete(key);
   }
@@ -47,16 +47,14 @@ async function groupTabWithGroups(tabId: number, groups: Group[]) {
   const group = host ? matchingGroup(host, groups) : undefined;
   if (!group || tab.windowId === undefined) return false;
 
-  await moveToGroup(tabId, tab.windowId, group.name, group.color);
-
-  return true;
+  return moveToGroup(tabId, tab.windowId, group.name, group.color);
 }
 
 export async function groupTab(tabId: number) {
   const settings = await getSettings();
   if (!settings.enabled) return false;
 
-  return groupTabWithGroups(tabId, settings.groups);
+  return (await groupTabWithGroups(tabId, settings.groups)) !== false;
 }
 
 export async function organizeCurrentWindow() {
@@ -64,15 +62,27 @@ export async function organizeCurrentWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const eligibleTabs = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
+  const updatedGroupIds = new Set<number>();
+  const activeGroupIds = new Set<number>();
   const results = await Promise.allSettled(
     eligibleTabs.map(async (tab) => {
-      const grouped = await groupTabWithGroups(tab.id, settings.groups);
-      if (!grouped && tab.groupId >= 0) {
+      const groupId = await groupTabWithGroups(tab.id, settings.groups);
+      if (groupId !== false) {
+        updatedGroupIds.add(groupId);
+        if (tab.active) activeGroupIds.add(groupId);
+        return true;
+      }
+      if (tab.groupId >= 0) {
         await chrome.tabs.ungroup(tab.id);
         return true;
       }
-      return grouped;
+      return false;
     }),
   );
+  if (settings.collapseGroups) {
+    await Promise.allSettled([...updatedGroupIds]
+      .filter((groupId) => !activeGroupIds.has(groupId))
+      .map((groupId) => chrome.tabGroups.update(groupId, { collapsed: true })));
+  }
   return results.filter((result) => result.status === 'fulfilled' && result.value).length;
 }

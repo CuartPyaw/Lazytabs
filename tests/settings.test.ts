@@ -23,6 +23,7 @@ describe('settings', () => {
 
     await expect(getSettings()).resolves.toEqual({
       enabled: true,
+      collapseGroups: true,
       theme: 'system',
       groups: [{
         id: 'github',

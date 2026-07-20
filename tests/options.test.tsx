@@ -7,6 +7,7 @@ import { OptionsApp } from '../entrypoints/options/OptionsApp';
 
 const storedSettings = {
   enabled: true,
+  collapseGroups: true,
   theme: 'system' as const,
   groups: [
     {
@@ -60,6 +61,16 @@ describe('OptionsApp interactions', () => {
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } });
+    });
+  });
+
+  it('persists automatic group collapsing', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('switch', { name: '整理后自动折叠' }));
+
+    await waitFor(() => {
+      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, collapseGroups: false } });
     });
   });
 

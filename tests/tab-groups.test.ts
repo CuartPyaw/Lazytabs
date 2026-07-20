@@ -11,6 +11,7 @@ describe('tab groups', () => {
   beforeEach(() => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
+      collapseGroups: true,
       theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
@@ -47,6 +48,7 @@ describe('tab groups', () => {
   it('groups remaining matching tabs when one tab cannot be grouped', async () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
+      collapseGroups: true,
       theme: 'system',
       groups: [
         { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
@@ -78,9 +80,11 @@ describe('tab groups', () => {
   it('organizes matching tabs when automatic grouping is disabled', async () => {
     mockedGetSettings.mockResolvedValue({
       enabled: false,
+      collapseGroups: false,
       theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
+    const update = vi.fn(async () => undefined);
 
     vi.stubGlobal('chrome', {
       tabs: {
@@ -90,11 +94,13 @@ describe('tab groups', () => {
       },
       tabGroups: {
         query: vi.fn(async () => []),
-        update: vi.fn(async () => undefined),
+        update,
       },
     });
 
     await expect(organizeCurrentWindow()).resolves.toBe(1);
+
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
   });
 
   it('removes non-matching tabs from existing groups', async () => {
@@ -116,5 +122,38 @@ describe('tab groups', () => {
     await expect(organizeCurrentWindow()).resolves.toBe(1);
 
     expect(ungroup).toHaveBeenCalledWith(1);
+  });
+
+  it('collapses updated groups except the active tab group', async () => {
+    mockedGetSettings.mockResolvedValue({
+      enabled: true,
+      collapseGroups: true,
+      theme: 'system',
+      groups: [
+        { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
+        { id: 'code', name: '代码', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
+      ],
+    });
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async (tabId: number) => ({ id: tabId, url: tabId === 1 ? 'https://youtube.com/watch' : 'https://github.com/openai', windowId: 1 })),
+        group: vi.fn(async (options: chrome.tabs.GroupOptions) => options.groupId),
+        query: vi.fn(async () => [
+          { id: 1, url: 'https://youtube.com/watch', windowId: 1, active: true },
+          { id: 2, url: 'https://github.com/openai', windowId: 1 },
+        ]),
+      },
+      tabGroups: {
+        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }]),
+        update,
+      },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(2);
+
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
   });
 });
