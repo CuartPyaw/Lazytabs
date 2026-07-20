@@ -169,10 +169,6 @@ export function OptionsApp() {
               <Settings2 size={17} strokeWidth={1.8} />
               通用
             </button>
-            {activeSection === 'groups' && <div className="mt-3 px-3 py-2 text-sm text-muted">
-              <span className="block font-medium text-foreground">{loaded ? settings.groups.reduce((count, group) => count + group.rules.length, 0) : '--'} 条规则</span>
-              <span className="mt-1 block text-xs">匹配域名后自动归类</span>
-            </div>}
           </div>
         </aside>
 
