@@ -1,4 +1,4 @@
-import { Button, Skeleton, Switch } from '@heroui/react';
+import { Button, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, CircleAlert, CirclePause, FolderInput, Layers3, Settings2, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -12,12 +12,14 @@ export function PopupApp() {
   const [organizeError, setOrganizeError] = useState<string>();
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [isUpdatingEnabled, setIsUpdatingEnabled] = useState(false);
+  const { setTheme } = useTheme();
   const isLoading = state === undefined;
   const isPaused = !organizeError && grouped === undefined && state?.enabled === false;
 
   useEffect(() => {
     void chrome.runtime.sendMessage({ type: 'popup-state' }).then(setState);
-  }, []);
+    void getSettings().then((settings) => setTheme(settings.theme));
+  }, [setTheme]);
 
   async function organize() {
     setIsOrganizing(true);

@@ -11,6 +11,7 @@ describe('tab groups', () => {
   beforeEach(() => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
+      theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
   });
@@ -46,6 +47,7 @@ describe('tab groups', () => {
   it('groups remaining matching tabs when one tab cannot be grouped', async () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
+      theme: 'system',
       groups: [
         { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
         { id: 'code', name: '代码', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
@@ -76,6 +78,7 @@ describe('tab groups', () => {
   it('organizes matching tabs when automatic grouping is disabled', async () => {
     mockedGetSettings.mockResolvedValue({
       enabled: false,
+      theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
     });
 

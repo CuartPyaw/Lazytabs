@@ -7,6 +7,7 @@ import { OptionsApp } from '../entrypoints/options/OptionsApp';
 
 const storedSettings = {
   enabled: true,
+  theme: 'system' as const,
   groups: [
     {
       id: 'video',
@@ -52,6 +53,16 @@ afterEach(() => {
 });
 
 describe('OptionsApp interactions', () => {
+  it('persists the selected theme', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.change(await screen.findByLabelText('主题'), { target: { value: 'dark' } });
+
+    await waitFor(() => {
+      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } });
+    });
+  });
+
   it('opens the group editor when the add button is clicked', async () => {
     render(<OptionsApp />);
 

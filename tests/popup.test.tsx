@@ -7,6 +7,7 @@ import { PopupApp } from '../entrypoints/popup/PopupApp';
 
 const storedSettings = {
   enabled: true,
+  theme: 'system' as const,
   groups: [{ id: 'video', name: '视频', color: 'blue' as const, enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
 };
 const storageGet = vi.fn();

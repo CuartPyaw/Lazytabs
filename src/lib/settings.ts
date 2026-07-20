@@ -3,7 +3,10 @@ import type { Group, GroupColor, Rule } from './rules';
 export type Settings = {
   enabled: boolean;
   groups: Group[];
+  theme: Theme;
 };
+
+export type Theme = 'light' | 'dark' | 'system';
 
 type LegacyRule = Rule & {
   groupName: string;
@@ -12,7 +15,7 @@ type LegacyRule = Rule & {
 };
 
 const settingsKey = 'settings';
-const defaultSettings: Settings = { enabled: true, groups: [] };
+const defaultSettings: Settings = { enabled: true, groups: [], theme: 'system' };
 
 function migrateRules(rules: LegacyRule[]) {
   return rules.reduce<Group[]>((groups, rule) => {

@@ -23,6 +23,7 @@ describe('settings', () => {
 
     await expect(getSettings()).resolves.toEqual({
       enabled: true,
+      theme: 'system',
       groups: [{
         id: 'github',
         name: '代码',

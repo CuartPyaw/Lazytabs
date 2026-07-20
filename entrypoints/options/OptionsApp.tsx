@@ -1,9 +1,9 @@
-import { Button, Card, Chip, Input, Skeleton, Switch } from '@heroui/react';
+import { Button, Card, Chip, Input, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
-import { getSettings, saveSettings, type Settings } from '../../src/lib/settings';
+import { getSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 
 const emptyGroup: GroupInput = { name: '', patterns: '', color: 'blue', enabled: true };
 const paletteColors: GroupColor[] = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink', 'grey'];
@@ -13,7 +13,7 @@ function nextId() {
 }
 
 export function OptionsApp() {
-  const [settings, setSettings] = useState<Settings>({ enabled: true, groups: [] });
+  const [settings, setSettings] = useState<Settings>({ enabled: true, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -21,6 +21,7 @@ export function OptionsApp() {
   const [editingRule, setEditingRule] = useState<{ pattern?: string; value: string }>();
   const [pasteError, setPasteError] = useState<string>();
   const [error, setError] = useState<string>();
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     void getSettings().then((value) => {
@@ -32,7 +33,7 @@ export function OptionsApp() {
       if (areaName !== 'local' || !changes.settings) return;
 
       const nextSettings = changes.settings.newValue as Settings | undefined;
-      if (nextSettings?.groups) {
+      if (nextSettings?.groups && nextSettings.theme) {
         setSettings(nextSettings);
       } else {
         void getSettings().then(setSettings);
@@ -43,6 +44,10 @@ export function OptionsApp() {
     return () => chrome.storage.onChanged.removeListener(handleSettingsChange);
   }, []);
 
+  useEffect(() => {
+    setTheme(settings.theme);
+  }, [setTheme, settings.theme]);
+
   const ruleError = Boolean(error && (error.startsWith('域名') || error === pasteError));
   const nameError = error === '请输入分组名称。' || error === '分组名称不能重复。';
   const patterns = splitPatterns(draft.patterns);
@@ -50,6 +55,13 @@ export function OptionsApp() {
   async function updateSettings(groups: Group[]) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, groups };
+    setSettings(next);
+    await saveSettings(next);
+  }
+
+  async function updateTheme(theme: Theme) {
+    const currentSettings = await getSettings();
+    const next = { ...currentSettings, theme };
     setSettings(next);
     await saveSettings(next);
   }
@@ -135,6 +147,14 @@ export function OptionsApp() {
               <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            主题
+            <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </label>
         </div>
       </header>
 
