@@ -209,7 +209,7 @@ export function OptionsApp() {
             <Card.Content>
               <RadioGroup aria-label="主题" className="grid max-w-lg grid-cols-3 gap-4" value={settings.theme} onChange={(theme) => void updateTheme(theme as Theme)}>
                 {themeOptions.map(({ value, label }) => (
-                  <Radio key={value} value={value}>
+                  <Radio key={value} className="w-full" value={value}>
                     <Radio.Content className={({ isSelected }) => `theme-choice ${isSelected ? 'theme-choice-selected' : ''}`}>
                       <span aria-hidden="true" className={`theme-preview theme-preview-${value}`}>
                         <span className="theme-preview-window">
