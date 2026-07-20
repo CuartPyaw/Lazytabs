@@ -161,6 +161,26 @@ describe('tab groups', () => {
     expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
   });
 
+  it('collapses groups only after a tab changes group membership', async () => {
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async () => ({ id: 1, url: 'https://youtube.com/watch', windowId: 1, groupId: 1 })),
+        group: vi.fn(async (options: chrome.tabs.GroupOptions) => options.groupId),
+        query: vi.fn(async () => [{ id: 1, url: 'https://youtube.com/watch', windowId: 1, groupId: 1 }]),
+      },
+      tabGroups: {
+        query: vi.fn(async () => [{ id: 1, title: '视频' }]),
+        update,
+      },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(1);
+
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
+  });
+
   it('organizes accessible tabs across all windows', async () => {
     const group = vi.fn(async (options: chrome.tabs.GroupOptions) => 'createProperties' in options ? 1 : options.groupId);
     const query = vi.fn(async () => [

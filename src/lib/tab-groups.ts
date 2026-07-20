@@ -76,12 +76,20 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
     eligibleTabs.map(async (tab) => {
       const groupId = await groupTabWithGroups(tab.id, settings.groups);
       if (groupId !== false) {
-        updatedGroupIds.add(groupId);
-        if (tab.active) activeGroupIds.add(groupId);
+        if (tab.groupId !== groupId) {
+          updatedGroupIds.add(groupId);
+          if (tab.groupId >= 0) updatedGroupIds.add(tab.groupId);
+          if (tab.active) {
+            activeGroupIds.add(groupId);
+            if (tab.groupId >= 0) activeGroupIds.add(tab.groupId);
+          }
+        }
         return true;
       }
       if (tab.groupId >= 0) {
         await chrome.tabs.ungroup(tab.id);
+        updatedGroupIds.add(tab.groupId);
+        if (tab.active) activeGroupIds.add(tab.groupId);
         return true;
       }
       return false;
