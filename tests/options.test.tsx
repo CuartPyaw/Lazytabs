@@ -57,6 +57,8 @@ describe('OptionsApp interactions', () => {
   it('persists the selected theme', async () => {
     render(<OptionsApp />);
 
+    expect(screen.queryByLabelText('主题')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
     fireEvent.change(await screen.findByLabelText('主题'), { target: { value: 'dark' } });
 
     await waitFor(() => {
@@ -67,6 +69,7 @@ describe('OptionsApp interactions', () => {
   it('persists automatic group collapsing', async () => {
     render(<OptionsApp />);
 
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
     fireEvent.click(await screen.findByRole('switch', { name: '整理后自动折叠' }));
 
     await waitFor(() => {

@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, FolderCog, Globe2, Layers3, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
@@ -21,6 +21,7 @@ export function OptionsApp() {
   const [editingRule, setEditingRule] = useState<{ pattern?: string; value: string }>();
   const [pasteError, setPasteError] = useState<string>();
   const [error, setError] = useState<string>();
+  const [activeSection, setActiveSection] = useState<'groups' | 'general'>('groups');
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export function OptionsApp() {
   return (
     <main className="min-h-[100dvh] bg-default/35 text-foreground">
       <header className="border-b border-default bg-surface">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6 px-6 py-4 lg:px-8">
+        <div className="mx-auto flex max-w-6xl items-center px-6 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Layers3 size={21} strokeWidth={2} /></span>
             <div>
@@ -154,41 +155,54 @@ export function OptionsApp() {
               <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
             </div>
           </div>
-          <div className="flex items-center gap-5">
-            <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}>
-              <Switch.Content>
-                <Switch.Control><Switch.Thumb /></Switch.Control>
-                整理后自动折叠
-              </Switch.Content>
-            </Switch>
-            <label className="flex items-center gap-2 text-sm text-muted">
-              主题
-              <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
-                <option value="system">跟随系统</option>
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
-              </select>
-            </label>
-          </div>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8">
         <aside className="self-start lg:sticky lg:top-6">
           <div className="rounded-xl border border-default bg-surface p-3">
-            <div className="flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary">
+            <button aria-pressed={activeSection === 'groups'} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium ${activeSection === 'groups' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-default'}`} type="button" onClick={() => setActiveSection('groups')}>
               <FolderCog size={17} strokeWidth={1.8} />
               分组规则
-            </div>
-            <div className="mt-3 px-3 py-2 text-sm text-muted">
+            </button>
+            <button aria-pressed={activeSection === 'general'} className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium ${activeSection === 'general' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-default'}`} type="button" onClick={() => setActiveSection('general')}>
+              <Settings2 size={17} strokeWidth={1.8} />
+              通用
+            </button>
+            {activeSection === 'groups' && <div className="mt-3 px-3 py-2 text-sm text-muted">
               <span className="block font-medium text-foreground">{loaded ? settings.groups.reduce((count, group) => count + group.rules.length, 0) : '--'} 条规则</span>
               <span className="mt-1 block text-xs">匹配域名后自动归类</span>
-            </div>
+            </div>}
           </div>
         </aside>
 
         <div className="grid gap-6">
-          <Card>
+          {activeSection === 'general' && <Card>
+            <Card.Header>
+              <div>
+                <Card.Title>通用</Card.Title>
+                <Card.Description>调整标签页整理的默认行为和显示主题。</Card.Description>
+              </div>
+            </Card.Header>
+            <Card.Content className="grid gap-5">
+              <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}>
+                <Switch.Content>
+                  <Switch.Control><Switch.Thumb /></Switch.Control>
+                  整理后自动折叠
+                </Switch.Content>
+              </Switch>
+              <label className="flex items-center gap-2 text-sm text-muted">
+                主题
+                <select aria-label="主题" className="rounded-md border border-default bg-surface px-2 py-1.5 text-sm text-foreground" value={settings.theme} onChange={(event) => void updateTheme(event.target.value as Theme)}>
+                  <option value="system">跟随系统</option>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                </select>
+              </label>
+            </Card.Content>
+          </Card>}
+
+          {activeSection === 'groups' && <Card>
             <Card.Header className="flex items-start justify-between gap-4">
               <div>
                 <Card.Title>分组规则</Card.Title>
@@ -224,9 +238,9 @@ export function OptionsApp() {
                 ))}
               </div>}
             </Card.Content>
-          </Card>
+          </Card>}
 
-          {editorOpen && <Card>
+          {activeSection === 'groups' && editorOpen && <Card>
             <Card.Header>
               <label className="flex items-center gap-2 text-sm font-medium">分组名称：
                 <Input aria-invalid={nameError} className={`w-64 ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
