@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
+import { groupTab, organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
 import { getSettings } from '../src/lib/settings';
 
 vi.mock('../src/lib/settings', () => ({ getSettings: vi.fn() }));
@@ -142,11 +142,13 @@ describe('tab groups', () => {
 
     vi.stubGlobal('chrome', {
       tabs: {
-        get: vi.fn(async (tabId: number) => ({ id: tabId, url: tabId === 1 ? 'https://youtube.com/watch' : 'https://github.com/openai', windowId: 1 })),
+        get: vi.fn(async (tabId: number) => ({ id: tabId, url: tabId === 1 ? 'https://youtube.com/watch' : 'https://github.com/openai', windowId: 1, groupId: -1 })),
         group: vi.fn(async (options: chrome.tabs.GroupOptions) => options.groupId),
-        query: vi.fn(async () => [
-          { id: 1, url: 'https://youtube.com/watch', windowId: 1, active: true },
-          { id: 2, url: 'https://github.com/openai', windowId: 1 },
+        query: vi.fn(async (queryInfo: chrome.tabs.QueryInfo) => queryInfo.active ? [
+          { id: 1, url: 'https://youtube.com/watch', windowId: 1, active: true, groupId: 1 },
+        ] : [
+          { id: 1, url: 'https://youtube.com/watch', windowId: 1, active: true, groupId: -1 },
+          { id: 2, url: 'https://github.com/openai', windowId: 1, groupId: -1 },
         ]),
       },
       tabGroups: {
@@ -156,6 +158,48 @@ describe('tab groups', () => {
     });
 
     await expect(organizeCurrentWindow()).resolves.toBe(2);
+
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
+  });
+
+  it('collapses every other group when automatic grouping moves a background tab', async () => {
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async () => ({ id: 1, url: 'https://youtube.com/watch', windowId: 1, groupId: -1 })),
+        group: vi.fn(async () => 1),
+        query: vi.fn(async () => [{ id: 2, windowId: 1, active: true, groupId: 2 }]),
+      },
+      tabGroups: {
+        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }, { id: 3, title: '其他', collapsed: true }]),
+        update,
+      },
+    });
+
+    await expect(groupTab(1)).resolves.toBe(true);
+
+    expect(update).toHaveBeenCalledWith(1, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(2, { collapsed: true });
+  });
+
+  it('keeps the focused tab group expanded after automatic grouping', async () => {
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async () => ({ id: 1, url: 'https://youtube.com/watch', windowId: 1, groupId: -1 })),
+        group: vi.fn(async () => 1),
+        query: vi.fn(async () => [{ id: 1, windowId: 1, active: true, groupId: 1 }]),
+      },
+      tabGroups: {
+        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }]),
+        update,
+      },
+    });
+
+    await expect(groupTab(1)).resolves.toBe(true);
 
     expect(update).toHaveBeenCalledWith(2, { collapsed: true });
     expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
