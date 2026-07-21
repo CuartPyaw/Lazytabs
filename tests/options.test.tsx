@@ -96,7 +96,7 @@ describe('OptionsApp interactions', () => {
     const addButton = await screen.findByRole('button', { name: '添加分组' });
     fireEvent.click(addButton);
 
-    expect(screen.getByLabelText('分组名称：')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
   });
 
   it('preserves the latest automatic grouping state when a group is saved', async () => {
@@ -144,7 +144,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.queryByDisplayValue('视频')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '添加分组' }));
-    expect(screen.getByLabelText('分组名称：')).toBeTruthy();
+    expect(screen.getByLabelText('分组名称')).toBeTruthy();
   });
 
   it('deletes a group and persists the result', async () => {
@@ -160,16 +160,15 @@ describe('OptionsApp interactions', () => {
     expect(screen.queryByText('youtube.com')).toBeNull();
   });
 
-  it('creates a group with a domain rule and persists it', async () => {
+  it('creates a group with multiple domain rules and persists it', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
-    fireEvent.change(screen.getByLabelText('分组名称：'), { target: { value: '工作' } });
+    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
+    fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
     fireEvent.click(screen.getByRole('button', { name: '添加域名规则' }));
-    const ruleInput = screen.getByRole('textbox', { name: '添加域名规则' });
-    fireEvent.change(ruleInput, { target: { value: 'example.com' } });
-    fireEvent.keyDown(ruleInput, { key: 'Enter' });
-    fireEvent.click(screen.getByRole('button', { name: '保存分组' }));
+    fireEvent.change(screen.getAllByLabelText('域名规则')[1], { target: { value: 'docs.example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: '完成' }));
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({
@@ -181,6 +180,38 @@ describe('OptionsApp interactions', () => {
               id: expect.any(String),
               name: '工作',
               color: 'blue',
+              enabled: true,
+              rules: [
+                { id: expect.any(String), pattern: 'example.com' },
+                { id: expect.any(String), pattern: 'docs.example.com' },
+              ],
+            },
+          ],
+        },
+      });
+    });
+  });
+
+  it('selects a group color from the palette', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
+    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '阅读' } });
+    fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: '选择标签组颜色' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'red' }));
+    fireEvent.click(screen.getByRole('button', { name: '完成' }));
+
+    await waitFor(() => {
+      expect(storageSet).toHaveBeenCalledWith({
+        settings: {
+          ...storedSettings,
+          groups: [
+            ...storedSettings.groups,
+            {
+              id: expect.any(String),
+              name: '阅读',
+              color: 'red',
               enabled: true,
               rules: [{ id: expect.any(String), pattern: 'example.com' }],
             },

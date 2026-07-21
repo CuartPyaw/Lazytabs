@@ -1,8 +1,8 @@
-import { Button, Card, Chip, Input, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
+import { Button, Card, Chip, Input, Modal, Popover, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup, validatePattern } from '../../src/lib/rules';
+import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 
 const emptyGroup: GroupInput = { name: '', patterns: '', color: 'blue', enabled: true };
@@ -22,9 +22,9 @@ export function OptionsApp() {
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
+  const [ruleInputs, setRuleInputs] = useState<string[]>(['']);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [editingRule, setEditingRule] = useState<{ pattern?: string; value: string }>();
-  const [pasteError, setPasteError] = useState<string>();
   const [error, setError] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
   const { setTheme } = useTheme();
@@ -54,9 +54,8 @@ export function OptionsApp() {
     setTheme(settings.theme);
   }, [setTheme, settings.theme]);
 
-  const ruleError = Boolean(error && (error.startsWith('域名') || error === pasteError));
   const nameError = error === '请输入分组名称。' || error === '分组名称不能重复。';
-  const patterns = splitPatterns(draft.patterns);
+  const ruleError = Boolean(error && !nameError);
 
   async function updateSettings(groups: Group[]) {
     const currentSettings = await getSettings();
@@ -91,11 +90,12 @@ export function OptionsApp() {
   }
 
   function beginEdit(group: Group) {
-    setDraft({ ...group, patterns: group.rules.map((rule) => rule.pattern).join('\n') });
+    const patterns = group.rules.map((rule) => rule.pattern);
+    setDraft({ ...group, patterns: patterns.join('\n') });
     setEditingId(group.id);
     setEditorOpen(true);
-    setEditingRule(undefined);
-    setPasteError(undefined);
+    setRuleInputs(patterns);
+    setPaletteOpen(false);
     setError(undefined);
   }
 
@@ -103,8 +103,8 @@ export function OptionsApp() {
     setDraft(emptyGroup);
     setEditingId(undefined);
     setEditorOpen(true);
-    setEditingRule(undefined);
-    setPasteError(undefined);
+    setRuleInputs(['']);
+    setPaletteOpen(false);
     setError(undefined);
   }
 
@@ -117,30 +117,19 @@ export function OptionsApp() {
     setEditingId(undefined);
     setDraft(emptyGroup);
     setEditorOpen(false);
-    setEditingRule(undefined);
-    setPasteError(undefined);
+    setRuleInputs(['']);
+    setPaletteOpen(false);
     setError(undefined);
   }
 
-  function setPatterns(nextPatterns: string[]) {
-    setDraft({ ...draft, patterns: splitPatterns(nextPatterns.join('\n')).join('\n') });
-    setPasteError(undefined);
+  function setRules(nextRuleInputs: string[]) {
+    setRuleInputs(nextRuleInputs);
+    setDraft({ ...draft, patterns: nextRuleInputs.join('\n') });
     setError(undefined);
-  }
-
-  function beginAddRule() {
-    setEditingRule({ value: '' });
-    setPasteError(undefined);
-  }
-
-  function saveRuleEdit() {
-    if (!editingRule || validatePattern(editingRule.value)) return;
-    setPatterns(editingRule.pattern ? patterns.map((pattern) => pattern === editingRule.pattern ? editingRule.value : pattern) : [...patterns, editingRule.value]);
-    setEditingRule(undefined);
   }
 
   async function saveGroup() {
-    const nextError = pasteError ?? (editingRule?.value ? validatePattern(editingRule.value) : undefined) ?? validateGroup(draft, settings.groups);
+    const nextError = validateGroup(draft, settings.groups);
     setError(nextError);
     if (nextError) return;
     const existing = settings.groups.find((group) => group.id === editingId);
@@ -277,49 +266,59 @@ export function OptionsApp() {
             </Card.Content>
           </Card>}
 
-          {activeSection === 'groups' && editorOpen && <Card>
-            <Card.Header>
-              <label className="flex items-center gap-2 text-sm font-medium">分组名称：
-                <Input aria-invalid={nameError} className={`w-64 ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
-              </label>
-            </Card.Header>
-            <Card.Content>
-              <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                <div className="grid gap-2 text-sm font-medium">
-                  <span id="domain-rules-label">域名规则</span>
-                  <div aria-invalid={ruleError} aria-labelledby="domain-rules-label" className="flex flex-wrap items-center gap-2" role="list">
-                    {patterns.map((pattern) => editingRule?.pattern === pattern ? (
-                      <Chip className={`border bg-surface px-2.5 py-1.5 shadow-sm ${ruleError ? 'border-danger' : 'border-default/80'}`} key={pattern} variant="soft" role="listitem">
-                        <input autoFocus aria-label={`编辑 ${pattern}`} className="min-w-32 bg-transparent text-sm outline-none" value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); setError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
-                      </Chip>
-                    ) : (
-                      <Chip className="gap-1.5 border border-default/80 bg-surface px-2.5 py-1.5 text-sm shadow-sm" key={pattern} variant="soft" role="listitem">
-                        <button aria-label={`编辑 ${pattern}`} className="border-0 bg-transparent p-0 text-left text-inherit" type="button" onClick={() => { setEditingRule({ pattern, value: pattern }); setPasteError(undefined); }}>{pattern}</button>
-                        <Button isIconOnly aria-label={`删除 ${pattern}`} className="size-5 min-h-5 min-w-5 text-inherit" size="sm" variant="tertiary" onPress={() => setPatterns(patterns.filter((item) => item !== pattern))}><X size={14} strokeWidth={2} /></Button>
-                      </Chip>
-                    ))}
-                    {editingRule && !editingRule.pattern && <Chip className={`border bg-surface px-2.5 py-1.5 shadow-sm ${ruleError ? 'border-danger' : 'border-default/80'}`} variant="soft" role="listitem">
-                      <input autoFocus aria-label="添加域名规则" className="min-w-32 bg-transparent text-sm outline-none" placeholder="输入域名" value={editingRule.value} onBlur={() => setEditingRule(undefined)} onChange={(event) => { setEditingRule({ ...editingRule, value: event.target.value }); setPasteError(undefined); setError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveRuleEdit(); } }} onPaste={(event) => { if (/\r?\n/.test(event.clipboardData.getData('text'))) { event.preventDefault(); setPasteError('一次只能添加一条规则。'); } }} />
-                    </Chip>}
-                    <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={beginAddRule}><Plus size={16} strokeWidth={2} /></Button>
-                  </div>
-                  {error && <span className="text-sm font-normal text-danger">{error}</span>}
-                </div>
-                <fieldset className="m-0 grid gap-2 border-0 p-0">
-                  <legend className="p-0 text-sm font-medium">标签组颜色</legend>
-                  <div className="color-palette" aria-label="标签组颜色">
-                    {paletteColors.map((color) => (
-                      <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color: color as GroupColor }); setError(undefined); }} />
-                    ))}
-                  </div>
-                </fieldset>
-                <div className="flex items-center justify-end gap-2">
-                  <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
-                  <Button type="submit"><Check size={17} strokeWidth={2} />{editingId ? '保存修改' : '保存分组'}</Button>
-                </div>
-              </form>
-            </Card.Content>
-          </Card>}
+          <Modal isOpen={editorOpen} onOpenChange={(isOpen) => { if (!isOpen) cancelEdit(); }}>
+            <Modal.Backdrop>
+              <Modal.Container placement="center" size="md">
+                <Modal.Dialog>
+                  <Modal.Header>
+                    <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
+                  </Modal.Header>
+                  <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                    <Modal.Body className="grid gap-5">
+                      <label className="grid gap-2 text-sm font-medium">分组名称
+                        <Input autoFocus aria-invalid={nameError} className={`w-64 max-w-full ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
+                      </label>
+                      <div className="grid gap-2 text-sm font-medium">
+                        <span id="domain-rules-label">域名规则</span>
+                        <div className="grid gap-2">
+                          {ruleInputs.map((value, index) => (
+                            <div className="flex items-end gap-2" key={index}>
+                              <Input aria-invalid={ruleError} aria-label="域名规则" className="w-64 max-w-full" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
+                              {index === 0 && <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /></Button>}
+                              {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
+                            </div>
+                          ))}
+                        </div>
+                        {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span>标签组颜色</span>
+                        <Popover isOpen={paletteOpen} onOpenChange={setPaletteOpen}>
+                          <Button isIconOnly aria-label="选择标签组颜色" size="sm" type="button" variant="tertiary"><Palette size={16} strokeWidth={2} /></Button>
+                          <Popover.Content placement="bottom start">
+                            <Popover.Dialog aria-label="标签组颜色">
+                              <div className="color-palette">
+                                {paletteColors.map((color) => (
+                                  <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color }); setPaletteOpen(false); setError(undefined); }} />
+                                ))}
+                              </div>
+                            </Popover.Dialog>
+                          </Popover.Content>
+                        </Popover>
+                      </div>
+                      <Switch aria-label="启用规则组" className="soft-switch" isSelected={draft.enabled} onChange={(enabled) => { setDraft({ ...draft, enabled }); setError(undefined); }}>
+                        <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>启用规则组</Switch.Content>
+                      </Switch>
+                    </Modal.Body>
+                    <Modal.Footer>
+                      <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
+                      <Button type="submit"><Check size={17} strokeWidth={2} />完成</Button>
+                    </Modal.Footer>
+                  </form>
+                </Modal.Dialog>
+              </Modal.Container>
+            </Modal.Backdrop>
+          </Modal>
         </div>
       </div>
     </main>
