@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { groupTab, organizeAllWindows, organizeCurrentWindow, getSettings } = vi.hoisted(() => ({
+const { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName, getSettings } = vi.hoisted(() => ({
   groupTab: vi.fn(),
   organizeAllWindows: vi.fn(),
   organizeCurrentWindow: vi.fn(),
+  syncGroupName: vi.fn(),
   getSettings: vi.fn(),
 }));
 
-vi.mock('../src/lib/tab-groups', () => ({ groupTab, organizeAllWindows, organizeCurrentWindow }));
+vi.mock('../src/lib/tab-groups', () => ({ groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName }));
 vi.mock('../src/lib/settings', () => ({ getSettings }));
 vi.mock('wxt/utils/define-background', () => ({
   defineBackground: (setup: () => void) => {
@@ -18,12 +19,14 @@ vi.mock('wxt/utils/define-background', () => ({
 describe('background commands', () => {
   const commandListeners: Array<(command: string) => void> = [];
   const messageListeners: Array<(message: { type?: string }, sender: unknown, sendResponse: (response: { grouped: number }) => void) => boolean | void> = [];
+  const groupUpdatedListeners: Array<(group: chrome.tabGroups.TabGroup) => void> = [];
 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
     commandListeners.length = 0;
     messageListeners.length = 0;
+    groupUpdatedListeners.length = 0;
     vi.stubGlobal('chrome', {
       commands: { onCommand: { addListener: vi.fn((listener) => commandListeners.push(listener)) } },
       runtime: { onMessage: { addListener: vi.fn((listener) => messageListeners.push(listener)) } },
@@ -31,6 +34,7 @@ describe('background commands', () => {
         onCreated: { addListener: vi.fn() },
         onUpdated: { addListener: vi.fn() },
       },
+      tabGroups: { onUpdated: { addListener: vi.fn((listener) => groupUpdatedListeners.push(listener)) } },
     });
 
     await import('../entrypoints/background');
@@ -46,6 +50,12 @@ describe('background commands', () => {
     commandListeners[0]('unrelated-command');
 
     expect(organizeCurrentWindow).not.toHaveBeenCalled();
+  });
+
+  it('syncs browser group title changes', () => {
+    groupUpdatedListeners[0]({ id: 1, title: '社区' } as chrome.tabGroups.TabGroup);
+
+    expect(syncGroupName).toHaveBeenCalledWith(1, '社区');
   });
 
   it('organizes all windows when enabled in settings', async () => {

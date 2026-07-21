@@ -1,4 +1,4 @@
-import { groupTab, organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
+import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
 import { getSettings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
@@ -13,6 +13,10 @@ export default defineBackground(() => {
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) void groupTab(tabId);
+  });
+
+  chrome.tabGroups.onUpdated.addListener((group) => {
+    if (group.title !== undefined) void syncGroupName(group.id, group.title);
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

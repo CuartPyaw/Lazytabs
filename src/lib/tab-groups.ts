@@ -1,5 +1,5 @@
 import { matchingGroup, type Group, type GroupColor } from './rules';
-import { getSettings } from './settings';
+import { getSettings, saveSettings } from './settings';
 
 const pendingGroups = new Map<string, Promise<number>>();
 
@@ -76,6 +76,27 @@ export async function groupTab(tabId: number) {
   if (settings.collapseGroups && result.previousGroupId !== result.groupId) {
     await collapseOtherGroups(result.windowId);
   }
+  return true;
+}
+
+export async function syncGroupName(groupId: number, name: string) {
+  const settings = await getSettings();
+  const tabs = await chrome.tabs.query({ groupId });
+  const group = tabs
+    .map((tab) => {
+      const host = hostname(tab.url);
+      return host ? matchingGroup(host, settings.groups) : undefined;
+    })
+    .find((candidate) => candidate);
+  const nextName = name.trim();
+
+  if (!group || !nextName || nextName === group.name || settings.groups.some((item) => item.id !== group.id && item.name === nextName)) return false;
+
+  await saveSettings({ ...settings, groups: settings.groups.map((item) => item.id === group.id ? { ...item, name: nextName } : item) });
+  const existingGroups = await chrome.tabGroups.query({});
+  await Promise.all(existingGroups
+    .filter((item) => item.title === group.name && item.id !== groupId)
+    .map((item) => chrome.tabGroups.update(item.id, { title: nextName })));
   return true;
 }
 

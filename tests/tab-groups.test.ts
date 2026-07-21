@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { groupTab, organizeAllWindows, organizeCurrentWindow } from '../src/lib/tab-groups';
-import { getSettings } from '../src/lib/settings';
+import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
+import { getSettings, saveSettings } from '../src/lib/settings';
 
-vi.mock('../src/lib/settings', () => ({ getSettings: vi.fn() }));
+vi.mock('../src/lib/settings', () => ({ getSettings: vi.fn(), saveSettings: vi.fn() }));
 
 const mockedGetSettings = vi.mocked(getSettings);
+const mockedSaveSettings = vi.mocked(saveSettings);
 
 describe('tab groups', () => {
   beforeEach(() => {
+    mockedSaveSettings.mockClear();
+    mockedSaveSettings.mockResolvedValue(undefined);
     mockedGetSettings.mockResolvedValue({
       enabled: true,
       collapseGroups: true,
@@ -248,5 +251,50 @@ describe('tab groups', () => {
 
     expect(query).toHaveBeenCalledWith({});
     expect(group).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs a browser group rename to the matching rule and other windows', async () => {
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        query: vi.fn(async () => [{ id: 1, url: 'https://youtube.com/watch', groupId: 1 }]),
+      },
+      tabGroups: {
+        query: vi.fn(async () => [{ id: 1, title: '社区' }, { id: 2, title: '视频' }]),
+        update,
+      },
+    });
+
+    await expect(syncGroupName(1, '社区')).resolves.toBe(true);
+
+    expect(mockedSaveSettings).toHaveBeenCalledWith(expect.objectContaining({
+      groups: [expect.objectContaining({ id: 'video', name: '社区' })],
+    }));
+    expect(update).toHaveBeenCalledWith(2, { title: '社区' });
+  });
+
+  it('ignores browser group names that duplicate another rule', async () => {
+    mockedGetSettings.mockResolvedValue({
+      enabled: true,
+      collapseGroups: true,
+      organizeAllWindows: false,
+      theme: 'system',
+      groups: [
+        { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
+        { id: 'code', name: '社区', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
+      ],
+    });
+    const update = vi.fn(async () => undefined);
+
+    vi.stubGlobal('chrome', {
+      tabs: { query: vi.fn(async () => [{ id: 1, url: 'https://youtube.com/watch', groupId: 1 }]) },
+      tabGroups: { query: vi.fn(async () => []), update },
+    });
+
+    await expect(syncGroupName(1, '社区')).resolves.toBe(false);
+
+    expect(mockedSaveSettings).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });
