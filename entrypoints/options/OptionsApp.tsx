@@ -221,7 +221,7 @@ export function OptionsApp() {
           </Card>}
 
           {activeSection === 'groups' && (editorOpen ? (
-            <Card>
+            <Card className="w-full max-w-lg">
               <Card.Header className="flex items-center gap-3">
                 <Button size="sm" type="button" variant="tertiary" onPress={cancelEdit}><ArrowLeft size={17} strokeWidth={1.9} /> 返回</Button>
                 <Card.Title>{editingId ? '编辑分组' : '添加分组'}</Card.Title>
