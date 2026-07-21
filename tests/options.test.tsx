@@ -67,7 +67,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByLabelText('匹配方式').textContent).toContain('包含');
     fireEvent.click(screen.getByLabelText('匹配字段'));
     expect(screen.getByRole('option', { name: '页面标题 (忽略大小写)' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '添加匹配规则' })).toBeNull();
+    expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
   });
 
   it('uses a wrapping grid for match controls in a narrow dialog', async () => {
@@ -78,7 +78,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByLabelText('匹配字段').parentElement?.parentElement?.className).toContain('minmax(192px,1fr)');
   });
 
-  it('creates a rule with a selected matching condition', async () => {
+  it('creates a rule with multiple matching conditions', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
@@ -87,6 +87,8 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(screen.getByLabelText('匹配字段'));
     fireEvent.click(screen.getByRole('option', { name: '完整URL' }));
     fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'github' } });
+    fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
+    fireEvent.change(screen.getAllByLabelText('匹配值')[1], { target: { value: 'gitlab' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
@@ -102,11 +104,23 @@ describe('OptionsApp interactions', () => {
             enabled: true,
             conditions: [
               { id: expect.any(String), field: 'url', operator: 'contains', value: 'github' },
+              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' },
             ],
           },
         ],
       },
     }));
+  });
+
+  it('removes an added matching condition', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
+    expect(screen.getAllByLabelText('匹配值')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: '删除第 2 条匹配规则' }));
+    expect(screen.getAllByLabelText('匹配值')).toHaveLength(1);
   });
 
   it('rejects a potentially conflicting rule before it is persisted', async () => {

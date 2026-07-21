@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Check, CircleMinus, CirclePlus, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleInput, type RuleOperator, validateRule } from '../../src/lib/rules';
@@ -251,7 +251,7 @@ export function OptionsApp() {
               <Card.Header className="flex items-start justify-between gap-4">
                 <div>
                   <Card.Title>分组规则</Card.Title>
-                  <Card.Description>每条规则配置一个匹配条件。</Card.Description>
+                  <Card.Description>每条规则可包含多条匹配条件。</Card.Description>
                 </div>
                 <Button size="sm" onPress={beginCreate}><Plus size={17} strokeWidth={1.9} /> 添加规则</Button>
               </Card.Header>
@@ -327,9 +327,14 @@ export function OptionsApp() {
                                   <Select.Popover><ListBox>{Object.entries(operatorLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover>
                                 </Select>
                                 <Input aria-invalid={conditionError} aria-label="匹配值" className={`w-full min-w-0 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
+                                <div className="flex items-center gap-2">
+                                  <button aria-label="添加匹配规则" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" title="添加匹配规则" type="button" onClick={() => setConditions([...draft.conditions, emptyCondition()])}><CirclePlus size={20} strokeWidth={2.1} /></button>
+                                  {draft.conditions.length > 1 && <button aria-label={`删除第 ${index + 1} 条匹配规则`} className="grid size-5 shrink-0 place-items-center rounded-full bg-danger text-danger-foreground" title="删除匹配规则" type="button" onClick={() => setConditions(draft.conditions.filter((_, itemIndex) => itemIndex !== index))}><CircleMinus size={20} strokeWidth={2.1} /></button>}
+                                </div>
                               </div>
                             ))}
                           </div>
+                          <p className="m-0 text-sm font-normal text-muted">任一条件匹配后，标签页会自动加入这个分组。</p>
                           {error && <span className="text-sm font-normal text-danger">{error}</span>}
                         </div>
                       </Modal.Body>
