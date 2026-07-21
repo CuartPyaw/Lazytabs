@@ -230,11 +230,11 @@ describe('OptionsApp interactions', () => {
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
     const ruleInput = screen.getByLabelText('域名规则');
     fireEvent.change(ruleInput, { target: { value: 'example.com' } });
-    expect(fireEvent.keyDown(ruleInput, { key: 'Enter' })).toBe(true);
-    fireEvent.submit(ruleInput.closest('form')!);
+    expect(fireEvent.keyDown(ruleInput, { key: 'Enter' })).toBe(false);
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalled();
     });
+    expect(screen.getByRole('dialog', { name: '编辑分组' })).toBeTruthy();
   });
 });
