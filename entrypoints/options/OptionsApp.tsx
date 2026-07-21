@@ -262,11 +262,10 @@ export function OptionsApp() {
               <Modal.Backdrop className="group-editor-backdrop">
                 <Modal.Container className="group-editor-container" placement="center" size="lg">
                   <Modal.Dialog className="rounded-3xl p-3">
-                    <form onKeyDown={(event) => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.preventDefault(); }} onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                      <Modal.Header className="items-center justify-between gap-3">
-                        <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
-                        <Button size="sm" type="submit"><Check size={16} strokeWidth={2} />确认</Button>
-                      </Modal.Header>
+                    <Modal.Header className="items-center gap-3">
+                      <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
+                    </Modal.Header>
+                    <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
                       <Modal.Body className="mt-4 grid gap-5">
                         <label className="grid gap-2 text-sm font-medium">分组名称
                           <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
