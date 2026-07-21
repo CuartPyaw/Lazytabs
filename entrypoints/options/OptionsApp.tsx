@@ -114,12 +114,7 @@ export function OptionsApp() {
   }
 
   function cancelEdit() {
-    setEditingId(undefined);
-    setDraft(emptyGroup);
     setEditorOpen(false);
-    setRuleInputs(['']);
-    setPaletteOpen(false);
-    setError(undefined);
   }
 
   function setRules(nextRuleInputs: string[]) {
@@ -267,8 +262,8 @@ export function OptionsApp() {
           </Card>}
 
           <Modal isOpen={editorOpen} onOpenChange={(isOpen) => { if (!isOpen) cancelEdit(); }}>
-            <Modal.Backdrop>
-              <Modal.Container placement="center" size="md">
+            <Modal.Backdrop className="group-editor-backdrop">
+              <Modal.Container className="group-editor-container" placement="center" size="md">
                 <Modal.Dialog>
                   <Modal.Header>
                     <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
