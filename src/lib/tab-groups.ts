@@ -58,11 +58,11 @@ async function groupTabWithGroups(tabId: number, groups: Group[]): Promise<Group
   return { groupId, previousGroupId: tab.groupId, windowId };
 }
 
-async function collapseOtherGroups(windowId: number) {
-  const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+async function collapseOtherGroups(windowId: number, destinationGroupIds?: Set<number>) {
+  const excludedGroupIds = destinationGroupIds ?? new Set((await chrome.tabs.query({ active: true, windowId })).map((tab) => tab.groupId));
   const groups = await chrome.tabGroups.query({ windowId });
   await Promise.allSettled(groups
-    .filter((group) => group.id !== activeTab?.groupId && !group.collapsed)
+    .filter((group) => !excludedGroupIds.has(group.id) && !group.collapsed)
     .map((group) => chrome.tabGroups.update(group.id, { collapsed: true })));
 }
 
@@ -74,7 +74,7 @@ export async function groupTab(tabId: number) {
   if (!result) return false;
 
   if (settings.collapseGroups && result.previousGroupId !== result.groupId) {
-    await collapseOtherGroups(result.windowId);
+    await collapseOtherGroups(result.windowId, new Set([result.groupId]));
   }
   return true;
 }
@@ -114,11 +114,17 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
   const eligibleTabs = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
   const updatedWindowIds = new Set<number>();
+  const destinationGroupsByWindow = new Map<number, Set<number>>();
   const results = await Promise.allSettled(
     eligibleTabs.map(async (tab) => {
       const result = await groupTabWithGroups(tab.id, settings.groups);
       if (result) {
-        if (result.previousGroupId !== result.groupId) updatedWindowIds.add(result.windowId);
+        if (result.previousGroupId !== result.groupId) {
+          updatedWindowIds.add(result.windowId);
+          const destinationGroupIds = destinationGroupsByWindow.get(result.windowId) ?? new Set<number>();
+          destinationGroupIds.add(result.groupId);
+          destinationGroupsByWindow.set(result.windowId, destinationGroupIds);
+        }
         return true;
       }
       if (tab.groupId >= 0) {
@@ -130,7 +136,7 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
     }),
   );
   if (settings.collapseGroups) {
-    await Promise.allSettled([...updatedWindowIds].map(collapseOtherGroups));
+    await Promise.allSettled([...updatedWindowIds].map((windowId) => collapseOtherGroups(windowId, destinationGroupsByWindow.get(windowId))));
   }
   return results.filter((result) => result.status === 'fulfilled' && result.value).length;
 }

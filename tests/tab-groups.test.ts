@@ -130,7 +130,7 @@ describe('tab groups', () => {
     expect(ungroup).toHaveBeenCalledWith(1);
   });
 
-  it('collapses updated groups except the active tab group', async () => {
+  it('keeps every destination group expanded when organizing tabs', async () => {
     mockedGetSettings.mockResolvedValue({
       enabled: true,
       collapseGroups: true,
@@ -155,36 +155,37 @@ describe('tab groups', () => {
         ]),
       },
       tabGroups: {
-        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }]),
+        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }, { id: 3, title: '其他' }]),
         update,
       },
     });
 
     await expect(organizeCurrentWindow()).resolves.toBe(2);
 
-    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).toHaveBeenCalledWith(3, { collapsed: true });
     expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(2, { collapsed: true });
   });
 
-  it('collapses every other group when automatic grouping moves a background tab', async () => {
+  it('collapses every group except the destination group when automatic grouping moves a background tab', async () => {
     const update = vi.fn(async () => undefined);
 
     vi.stubGlobal('chrome', {
       tabs: {
         get: vi.fn(async () => ({ id: 1, url: 'https://youtube.com/watch', windowId: 1, groupId: -1 })),
         group: vi.fn(async () => 1),
-        query: vi.fn(async () => [{ id: 2, windowId: 1, active: true, groupId: 2 }]),
       },
       tabGroups: {
-        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }, { id: 3, title: '其他', collapsed: true }]),
+        query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '代码' }, { id: 3, title: '其他' }]),
         update,
       },
     });
 
     await expect(groupTab(1)).resolves.toBe(true);
 
-    expect(update).toHaveBeenCalledWith(1, { collapsed: true });
-    expect(update).not.toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).toHaveBeenCalledWith(3, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
   });
 
   it('keeps the focused tab group expanded after automatic grouping', async () => {
