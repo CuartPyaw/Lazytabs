@@ -59,6 +59,7 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
 
     expect(screen.getByRole('dialog', { name: '添加规则' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '添加规则' }).className).toContain('max-w-2xl');
     expect(screen.getByLabelText('规则名称')).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
     expect(screen.getByLabelText('分组颜色').tagName).toBe('BUTTON');

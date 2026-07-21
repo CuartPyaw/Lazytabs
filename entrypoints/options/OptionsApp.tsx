@@ -287,7 +287,7 @@ export function OptionsApp() {
             <Modal isOpen={editorOpen} onOpenChange={(isOpen) => { if (!isOpen) cancelEdit(); }}>
               <Modal.Backdrop className="group-editor-backdrop">
                 <Modal.Container className="group-editor-container" placement="center" size="lg">
-                  <Modal.Dialog className="rounded-lg p-0">
+                  <Modal.Dialog className="w-full max-w-2xl rounded-lg p-0">
                     <Modal.Header className="items-center gap-3 border-b border-default px-4 py-3">
                       <Modal.Heading>{editingId ? '编辑规则' : '添加规则'}</Modal.Heading>
                     </Modal.Header>
