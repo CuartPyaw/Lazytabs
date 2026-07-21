@@ -10,14 +10,20 @@ describe('settings', () => {
     vi.stubGlobal('chrome', { storage: { local: { get } } });
   });
 
-  it('migrates saved rules into groups', async () => {
+  it('migrates saved groups into independent rules without changing their matching behavior', async () => {
     get.mockResolvedValue({
       settings: {
         enabled: true,
-        rules: [
-          { id: 'github', pattern: 'github.com', groupName: '代码', color: 'blue', enabled: true },
-          { id: 'gitlab', pattern: 'gitlab.com', groupName: '代码', color: 'blue', enabled: true },
-        ],
+        groups: [{
+          id: 'code',
+          name: '代码',
+          color: 'blue',
+          enabled: true,
+          rules: [
+            { id: 'github', pattern: 'github.com' },
+            { id: 'github-subdomain', pattern: '*.github.com' },
+          ],
+        }],
       },
     });
 
@@ -26,16 +32,24 @@ describe('settings', () => {
       collapseGroups: true,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [{
-        id: 'github',
-        name: '代码',
-        color: 'blue',
-        enabled: true,
-        rules: [
-          { id: 'github', pattern: 'github.com' },
-          { id: 'gitlab', pattern: 'gitlab.com' },
-        ],
-      }],
+      rules: [
+        {
+          id: 'github',
+          name: 'github.com',
+          groupName: '代码',
+          color: 'blue',
+          enabled: true,
+          conditions: [{ id: 'github', field: 'hostname', operator: 'equals', value: 'github.com' }],
+        },
+        {
+          id: 'github-subdomain',
+          name: '*.github.com',
+          groupName: '代码',
+          color: 'blue',
+          enabled: true,
+          conditions: [{ id: 'github-subdomain', field: 'hostname', operator: 'regex', value: '^[^.]+\\.github\\.com$' }],
+        },
+      ],
     });
   });
 });

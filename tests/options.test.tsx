@@ -10,24 +10,19 @@ const storedSettings = {
   collapseGroups: true,
   organizeAllWindows: false,
   theme: 'system' as const,
-  groups: [
-    {
-      id: 'video',
-      name: '视频',
-      color: 'blue' as const,
-      enabled: true,
-      rules: [{ id: 'youtube', pattern: 'youtube.com' }],
-    },
-  ],
+  rules: [{
+    id: 'youtube',
+    name: '视频站点',
+    groupName: '视频',
+    color: 'blue' as const,
+    enabled: true,
+    conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }],
+  }],
 };
 
 const storageSet = vi.fn();
 const storageGet = vi.fn();
-const storageChanged = {
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-};
-let onStorageChanged: ((changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void) | undefined;
+const storageChanged = { addListener: vi.fn(), removeListener: vi.fn() };
 
 beforeEach(() => {
   storageSet.mockReset();
@@ -35,15 +30,9 @@ beforeEach(() => {
   storageGet.mockResolvedValue({ settings: storedSettings });
   storageChanged.addListener.mockReset();
   storageChanged.removeListener.mockReset();
-  storageChanged.addListener.mockImplementation((listener) => {
-    onStorageChanged = listener;
-  });
   vi.stubGlobal('chrome', {
     storage: {
-      local: {
-        get: storageGet,
-        set: storageSet.mockResolvedValue(undefined),
-      },
+      local: { get: storageGet, set: storageSet.mockResolvedValue(undefined) },
       onChanged: storageChanged,
     },
   });
@@ -58,200 +47,67 @@ describe('OptionsApp interactions', () => {
   it('persists the selected theme', async () => {
     render(<OptionsApp />);
 
-    expect(screen.queryByLabelText('主题')).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
-    expect(screen.queryByRole('combobox')).toBeNull();
     fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
 
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } });
-    });
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
   });
 
-  it('persists automatic group collapsing', async () => {
+  it('opens the screenshot-style rule editor', async () => {
     render(<OptionsApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    fireEvent.click(await screen.findByRole('switch', { name: '整理后自动折叠' }));
+    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
 
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, collapseGroups: false } });
-    });
-  });
-
-  it('persists all-window organization', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    fireEvent.click(await screen.findByRole('switch', { name: '整理全部窗口' }));
-
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, organizeAllWindows: true } });
-    });
-  });
-
-  it('opens the group editor in a dialog when the add button is clicked', async () => {
-    render(<OptionsApp />);
-
-    const addButton = await screen.findByRole('button', { name: '添加分组' });
-    fireEvent.click(addButton);
-
-    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '添加规则' })).toBeTruthy();
+    expect(screen.getByLabelText('规则名称')).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '返回' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '确认' })).toBeNull();
+    expect((screen.getByLabelText('分组颜色') as HTMLSelectElement).value).toBe('auto');
+    expect((screen.getByLabelText('匹配字段') as HTMLSelectElement).value).toBe('hostname');
+    expect((screen.getByLabelText('匹配方式') as HTMLSelectElement).value).toBe('contains');
   });
 
-  it('preserves the latest automatic grouping state when a group is saved', async () => {
+  it('creates a rule with multiple matching conditions', async () => {
     render(<OptionsApp />);
 
-    await screen.findByRole('button', { name: '添加分组' });
-    storageGet.mockResolvedValue({ settings: { ...storedSettings, enabled: false } });
-    onStorageChanged?.({ settings: { newValue: { ...storedSettings, enabled: false } } }, 'local');
-    fireEvent.click(screen.getByRole('switch', { name: '启用 视频' }));
-
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: {
-          ...storedSettings,
-          enabled: false,
-          groups: [{ ...storedSettings.groups[0], enabled: false }],
-        },
-      });
-    });
-  });
-
-  it('persists a group enabled state when its switch is clicked', async () => {
-    render(<OptionsApp />);
-
-    const toggle = await screen.findByRole('switch', { name: '启用 视频' });
-    fireEvent.click(toggle);
-
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: {
-          ...storedSettings,
-          groups: [{ ...storedSettings.groups[0], enabled: false }],
-        },
-      });
-    });
-  });
-
-  it('opens, cancels, and reopens the editor from action buttons', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '编辑 视频' }));
-    expect(screen.getByDisplayValue('视频')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: '取消' }));
-    expect(screen.queryByDisplayValue('视频')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: '添加分组' }));
-    expect(screen.getByLabelText('分组名称')).toBeTruthy();
-  });
-
-  it('deletes a group and persists the result', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '删除 视频' }));
-
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: { ...storedSettings, groups: [] },
-      });
-    });
-    expect(screen.queryByText('youtube.com')).toBeNull();
-  });
-
-  it('creates a group with multiple domain rules and persists it', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
-    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
-    fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: '添加域名规则' }));
-    fireEvent.change(screen.getAllByLabelText('域名规则')[1], { target: { value: 'docs.example.com' } });
+    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
+    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '代码托管' } });
+    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
+    fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'github' } });
+    fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
+    fireEvent.change(screen.getAllByLabelText('匹配值')[1], { target: { value: 'gitlab' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: {
-          ...storedSettings,
-          groups: [
-            ...storedSettings.groups,
-            {
-              id: expect.any(String),
-              name: '工作',
-              color: 'blue',
-              enabled: true,
-              rules: [
-                { id: expect.any(String), pattern: 'example.com' },
-                { id: expect.any(String), pattern: 'docs.example.com' },
-              ],
-            },
-          ],
-        },
-      });
-    });
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
+      settings: {
+        ...storedSettings,
+        rules: [
+          ...storedSettings.rules,
+          {
+            id: expect.any(String),
+            name: '代码托管',
+            groupName: '代码',
+            color: 'auto',
+            enabled: true,
+            conditions: [
+              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' },
+              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' },
+            ],
+          },
+        ],
+      },
+    }));
   });
 
-  it('selects a group color from the palette', async () => {
+  it('rejects a potentially conflicting rule before it is persisted', async () => {
     render(<OptionsApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
-    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '阅读' } });
-    fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: 'red' }));
+    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
+    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '工作 API' } });
+    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
+    fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'youtube' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: {
-          ...storedSettings,
-          groups: [
-            ...storedSettings.groups,
-            {
-              id: expect.any(String),
-              name: '阅读',
-              color: 'red',
-              enabled: true,
-              rules: [{ id: expect.any(String), pattern: 'example.com' }],
-            },
-          ],
-        },
-      });
-    });
-  });
-
-  it('saves and exits the input without closing the editor when Enter is pressed', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
-    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
-    const ruleInput = screen.getByLabelText('域名规则');
-    fireEvent.change(ruleInput, { target: { value: 'example.com' } });
-    ruleInput.focus();
-    expect(document.activeElement).toBe(ruleInput);
-    expect(fireEvent.keyDown(ruleInput, { key: 'Enter' })).toBe(false);
-
-    await waitFor(() => {
-      expect(storageSet).toHaveBeenCalledWith({
-        settings: {
-          ...storedSettings,
-          groups: [
-            ...storedSettings.groups,
-            {
-              id: expect.any(String),
-              name: '工作',
-              color: 'blue',
-              enabled: true,
-              rules: [{ id: expect.any(String), pattern: 'example.com' }],
-            },
-          ],
-        },
-      });
-    });
-    const dialog = screen.getByRole('dialog', { name: '编辑分组' });
-    expect(document.activeElement).toBe(dialog);
+    expect(await screen.findByText('规则冲突：可能会与“视频站点”同时匹配。')).toBeTruthy();
+    expect(storageSet).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ describe('tab groups', () => {
       collapseGroups: true,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
+      rules: [{ id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue', enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }],
     });
   });
 
@@ -55,9 +55,9 @@ describe('tab groups', () => {
       collapseGroups: true,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [
-        { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
-        { id: 'code', name: '代码', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
+      rules: [
+        { id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue', enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] },
+        { id: 'github', name: '代码托管', groupName: '代码', color: 'green', enabled: true, conditions: [{ id: 'github-host', field: 'hostname', operator: 'contains', value: 'github.com' }] },
       ],
     });
 
@@ -88,7 +88,7 @@ describe('tab groups', () => {
       collapseGroups: false,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
+      rules: [{ id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue', enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }],
     });
     const update = vi.fn(async () => undefined);
 
@@ -136,9 +136,9 @@ describe('tab groups', () => {
       collapseGroups: true,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [
-        { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
-        { id: 'code', name: '代码', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
+      rules: [
+        { id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue', enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] },
+        { id: 'github', name: '代码托管', groupName: '代码', color: 'green', enabled: true, conditions: [{ id: 'github-host', field: 'hostname', operator: 'contains', value: 'github.com' }] },
       ],
     });
     const update = vi.fn(async () => undefined);
@@ -270,7 +270,7 @@ describe('tab groups', () => {
     await expect(syncGroupName(1, '社区')).resolves.toBe(true);
 
     expect(mockedSaveSettings).toHaveBeenCalledWith(expect.objectContaining({
-      groups: [expect.objectContaining({ id: 'video', name: '社区' })],
+      rules: [expect.objectContaining({ id: 'youtube', groupName: '社区' })],
     }));
     expect(update).toHaveBeenCalledWith(2, { title: '社区' });
   });
@@ -281,9 +281,9 @@ describe('tab groups', () => {
       collapseGroups: true,
       organizeAllWindows: false,
       theme: 'system',
-      groups: [
-        { id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] },
-        { id: 'code', name: '社区', color: 'green', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }] },
+      rules: [
+        { id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue', enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] },
+        { id: 'github', name: '代码托管', groupName: '社区', color: 'green', enabled: true, conditions: [{ id: 'github-host', field: 'hostname', operator: 'contains', value: 'github.com' }] },
       ],
     });
     const update = vi.fn(async () => undefined);

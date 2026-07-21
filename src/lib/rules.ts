@@ -1,83 +1,103 @@
 export const GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'] as const;
 
+export const MATCH_OPERATORS = ['contains', 'startsWith', 'endsWith', 'equals', 'regex'] as const;
+
 export type GroupColor = (typeof GROUP_COLORS)[number];
+export type RuleColor = GroupColor | 'auto';
+export type RuleOperator = (typeof MATCH_OPERATORS)[number];
+
+export type MatchCondition = {
+  id: string;
+  field: 'hostname';
+  operator: RuleOperator;
+  value: string;
+};
 
 export type Rule = {
   id: string;
-  pattern: string;
-};
-
-export type Group = {
-  id: string;
   name: string;
-  color: GroupColor;
+  groupName: string;
+  color: RuleColor;
   enabled: boolean;
-  rules: Rule[];
+  conditions: MatchCondition[];
 };
 
-export type GroupInput = Omit<Group, 'id' | 'rules'> & {
+export type RuleInput = Omit<Rule, 'id'> & {
   id?: string;
-  patterns: string;
 };
 
-const wildcardPattern = /^[a-z0-9*.-]+$/i;
-const domainPattern = /^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
-
-export function normalizePattern(pattern: string) {
-  return pattern.trim().toLowerCase().replace(/\.$/, '');
+function normalizeHostname(value: string) {
+  return value.trim().toLowerCase().replace(/\.$/, '');
 }
 
-export function splitPatterns(value: string) {
-  return [...new Set(value.split(/\r?\n/).map(normalizePattern).filter(Boolean))];
+export function matchesCondition(hostname: string, condition: MatchCondition) {
+  const host = normalizeHostname(hostname);
+  const value = normalizeHostname(condition.value);
+
+  if (!value) return false;
+  if (condition.operator === 'contains') return host.includes(value);
+  if (condition.operator === 'startsWith') return host.startsWith(value);
+  if (condition.operator === 'endsWith') return host.endsWith(value);
+  if (condition.operator === 'equals') return host === value;
+
+  try {
+    return new RegExp(condition.value, 'i').test(host);
+  } catch {
+    return false;
+  }
 }
 
-export function validatePattern(value: string) {
-  const pattern = normalizePattern(value);
+export function conditionsOverlap(first: MatchCondition, second: MatchCondition) {
+  const left = normalizeHostname(first.value);
+  const right = normalizeHostname(second.value);
+  if (!left || !right) return true;
+  if (first.operator === 'regex' || second.operator === 'regex') return first.operator === second.operator && first.value === second.value;
 
-  if (!pattern || !wildcardPattern.test(pattern)) return '域名通配符只能包含字母、数字、连字符、点和 *。';
-  if (!domainPattern.test(pattern)) return '域名规则必须是完整域名，或以 *. 开头的子域名通配符。';
-}
+  if (first.operator === 'equals') return matchesCondition(left, second);
+  if (second.operator === 'equals') return matchesCondition(right, first);
+  if (first.operator === 'startsWith' && second.operator === 'startsWith') return left.startsWith(right) || right.startsWith(left);
+  if (first.operator === 'endsWith' && second.operator === 'endsWith') return left.endsWith(right) || right.endsWith(left);
+  if (first.operator === 'contains' && second.operator === 'contains') return left.includes(right) || right.includes(left);
+  if (first.operator === 'contains') return right.includes(left);
+  if (second.operator === 'contains') return left.includes(right);
 
-export function matchesHost(host: string, pattern: string) {
-  const normalized = normalizePattern(pattern);
-  const normalizedHost = normalizePattern(host);
-
-  if (!normalized.startsWith('*.')) return normalizedHost === normalized;
-
-  const domain = normalized.slice(2);
-  return normalizedHost.endsWith(`.${domain}`) && normalizedHost.split('.').length === domain.split('.').length + 1;
-}
-
-export function patternsOverlap(first: string, second: string) {
-  const left = normalizePattern(first);
-  const right = normalizePattern(second);
-
-  if (left === right) return true;
-  if (left.startsWith('*.')) return matchesHost(right, left);
-  if (right.startsWith('*.')) return matchesHost(left, right);
+  // ponytail: this rejects only statically provable overlaps; use regex automata if exhaustive conflict detection becomes necessary.
   return false;
 }
 
-export function findRuleConflict(candidate: GroupInput, groups: Group[]) {
+export function validateCondition(condition: MatchCondition) {
+  if (!condition.value.trim()) return '请输入匹配值。';
+
+  if (condition.operator === 'regex') {
+    try {
+      new RegExp(condition.value, 'i');
+    } catch {
+      return '请输入有效的正则表达式。';
+    }
+  }
+}
+
+export function findRuleConflict(candidate: RuleInput, rules: Rule[]) {
   if (!candidate.enabled) return undefined;
 
-  return groups
-    .filter((group) => group.enabled && group.id !== candidate.id)
-    .flatMap((group) => group.rules)
-    .find((rule) => splitPatterns(candidate.patterns).some((pattern) => patternsOverlap(rule.pattern, pattern)))?.pattern;
+  return rules.find((rule) =>
+    rule.enabled
+    && rule.id !== candidate.id
+    && rule.groupName.trim() !== candidate.groupName.trim()
+    && candidate.conditions.some((condition) => rule.conditions.some((existing) => conditionsOverlap(condition, existing))),
+  )?.name;
 }
 
-export function validateGroup(candidate: GroupInput, groups: Group[]) {
-  const patterns = splitPatterns(candidate.patterns);
-  const patternError = patterns.map(validatePattern).find(Boolean) ?? (patterns.length ? undefined : validatePattern(''));
-  if (patternError) return patternError;
-  if (!candidate.name.trim()) return '请输入分组名称。';
-  if (groups.some((group) => group.id !== candidate.id && group.name.trim() === candidate.name.trim())) return '分组名称不能重复。';
+export function validateRule(candidate: RuleInput, rules: Rule[]) {
+  const conditionError = candidate.conditions.map(validateCondition).find(Boolean);
+  if (conditionError) return conditionError;
+  if (!candidate.name.trim()) return '请输入规则名称。';
+  if (!candidate.groupName.trim()) return '请输入分组名称。';
 
-  const conflict = findRuleConflict(candidate, groups);
-  return conflict ? `规则冲突：该模式会与 ${conflict} 同时匹配。` : undefined;
+  const conflict = findRuleConflict(candidate, rules);
+  return conflict ? `规则冲突：可能会与“${conflict}”同时匹配。` : undefined;
 }
 
-export function matchingGroup(host: string, groups: Group[]) {
-  return groups.find((group) => group.enabled && group.rules.some((rule) => matchesHost(host, rule.pattern)));
+export function matchingRule(hostname: string, rules: Rule[]) {
+  return rules.find((rule) => rule.enabled && rule.conditions.some((condition) => matchesCondition(hostname, condition)));
 }

@@ -10,7 +10,7 @@ const storedSettings = {
   collapseGroups: true,
   organizeAllWindows: false,
   theme: 'system' as const,
-  groups: [{ id: 'video', name: '视频', color: 'blue' as const, enabled: true, rules: [{ id: 'youtube', pattern: 'youtube.com' }] }],
+  rules: [{ id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue' as const, enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }] }],
 };
 const storageGet = vi.fn();
 const storageSet = vi.fn();

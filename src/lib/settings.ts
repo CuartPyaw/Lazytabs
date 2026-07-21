@@ -1,41 +1,75 @@
-import type { Group, GroupColor, Rule } from './rules';
+import type { GroupColor, MatchCondition, Rule } from './rules';
 
 export type Settings = {
   enabled: boolean;
   collapseGroups: boolean;
   organizeAllWindows: boolean;
-  groups: Group[];
+  rules: Rule[];
   theme: Theme;
 };
 
 export type Theme = 'light' | 'dark' | 'system';
 
-type LegacyRule = Rule & {
+type LegacyPattern = {
+  id: string;
+  pattern: string;
+};
+
+type LegacyRule = LegacyPattern & {
   groupName: string;
   color: GroupColor;
   enabled: boolean;
 };
 
-const settingsKey = 'settings';
-const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' };
+type LegacyGroup = {
+  id: string;
+  name: string;
+  color: GroupColor;
+  enabled: boolean;
+  rules: LegacyPattern[];
+};
 
-function migrateRules(rules: LegacyRule[]) {
-  return rules.reduce<Group[]>((groups, rule) => {
-    const group = groups.find((item) => item.name === rule.groupName && item.color === rule.color && item.enabled === rule.enabled);
-    if (group) {
-      group.rules.push({ id: rule.id, pattern: rule.pattern });
-    } else {
-      groups.push({ id: rule.id, name: rule.groupName, color: rule.color, enabled: rule.enabled, rules: [{ id: rule.id, pattern: rule.pattern }] });
-    }
-    return groups;
-  }, []);
+const settingsKey = 'settings';
+const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, rules: [], theme: 'system' };
+
+function conditionForPattern(pattern: string, id: string): MatchCondition {
+  const value = pattern.trim().toLowerCase().replace(/\.$/, '');
+  if (!value.startsWith('*.')) return { id, field: 'hostname', operator: 'equals', value };
+
+  const domain = value.slice(2).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return { id, field: 'hostname', operator: 'regex', value: `^[^.]+\\.${domain}$` };
+}
+
+function migrateLegacyRules(rules: LegacyRule[]) {
+  return rules.map((rule) => ({
+    id: rule.id,
+    name: rule.pattern,
+    groupName: rule.groupName,
+    color: rule.color,
+    enabled: rule.enabled,
+    conditions: [conditionForPattern(rule.pattern, rule.id)],
+  }));
+}
+
+function migrateGroups(groups: LegacyGroup[]) {
+  return groups.flatMap((group) => migrateLegacyRules(group.rules.map((rule) => ({ ...rule, groupName: group.name, color: group.color, enabled: group.enabled }))));
+}
+
+function isCurrentRule(value: unknown): value is Rule {
+  return typeof value === 'object' && value !== null && 'conditions' in value;
 }
 
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(settingsKey);
-  const value = stored[settingsKey] as Partial<Settings> & { rules?: LegacyRule[] } | undefined;
+  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[]; rules?: LegacyRule[] | Rule[] } | undefined;
   const { rules, groups, ...settings } = value ?? {};
-  return { ...defaultSettings, ...settings, groups: groups ?? migrateRules(rules ?? []) };
+  const currentRules = Array.isArray(rules) && rules.every(isCurrentRule) ? rules : undefined;
+
+  return {
+    ...defaultSettings,
+    ...settings,
+    rules: currentRules ?? (Array.isArray(groups) ? migrateGroups(groups) : migrateLegacyRules(Array.isArray(rules) ? rules as LegacyRule[] : [])),
+  };
 }
 
 export async function saveSettings(settings: Settings) {

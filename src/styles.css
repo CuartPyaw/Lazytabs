@@ -21,21 +21,6 @@ button { font: inherit; }
 @keyframes group-editor-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes group-editor-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
-.icon-button { display: inline-flex; align-items: center; justify-content: center; }
-.color-palette { display: flex; flex-wrap: wrap; gap: 8px; }
-.color-choice { width: 32px; height: 32px; border: 0; border-radius: 4px; background: var(--group-color); cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
-.color-choice[data-selected="true"] { transform: scale(.84); box-shadow: 0 2px 5px color-mix(in srgb, var(--foreground) 24%, transparent); }
-.group-swatch { background: var(--group-color); }
-.color-grey { --group-color: #5f6368; }
-.color-blue { --group-color: #1a73e8; }
-.color-red { --group-color: #d93025; }
-.color-yellow { --group-color: #f9ab00; }
-.color-green { --group-color: #188038; }
-.color-pink { --group-color: #d01884; }
-.color-purple { --group-color: #9334e6; }
-.color-cyan { --group-color: #007b83; }
-.color-orange { --group-color: #e8710a; }
-
 .theme-choice { display: grid; width: 100%; gap: 8px; color: var(--foreground); font-size: 0.875rem; font-weight: 500; text-align: center; }
 .theme-preview { position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent); border-radius: 8px; background: #efefef; }
 .theme-preview-system::before { position: absolute; top: 0; right: 0; bottom: 0; width: 50%; background: #484848; content: ''; }

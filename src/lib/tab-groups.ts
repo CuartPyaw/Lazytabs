@@ -1,4 +1,4 @@
-import { matchingGroup, type Group, type GroupColor } from './rules';
+import { GROUP_COLORS, matchingRule, type Rule, type RuleColor } from './rules';
 import { getSettings, saveSettings } from './settings';
 
 const pendingGroups = new Map<string, Promise<number>>();
@@ -15,7 +15,7 @@ function hostname(url?: string) {
   return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.hostname : undefined;
 }
 
-async function moveToGroup(tabId: number, windowId: number, groupName: string, color: GroupColor) {
+async function moveToGroup(tabId: number, windowId: number, groupName: string, color: RuleColor) {
   const key = `${windowId}:${groupName}`;
   const pendingGroup = pendingGroups.get(key);
   if (pendingGroup) {
@@ -33,7 +33,8 @@ async function moveToGroup(tabId: number, windowId: number, groupName: string, c
     }
 
     const created = await chrome.tabs.group({ createProperties: { windowId }, tabIds: [tabId] });
-    await chrome.tabGroups.update(created, { color, title: groupName });
+    const groupColor = color === 'auto' ? GROUP_COLORS[Math.floor(Math.random() * GROUP_COLORS.length)] : color;
+    await chrome.tabGroups.update(created, { color: groupColor, title: groupName });
     return created;
   })();
 
@@ -45,16 +46,16 @@ async function moveToGroup(tabId: number, windowId: number, groupName: string, c
   }
 }
 
-async function groupTabWithGroups(tabId: number, groups: Group[]): Promise<GroupResult | false> {
+async function groupTabWithRules(tabId: number, rules: Rule[]): Promise<GroupResult | false> {
   const tab = await chrome.tabs.get(tabId);
   if (tab.pinned || tab.incognito) return false;
 
   const host = hostname(tab.url);
-  const group = host ? matchingGroup(host, groups) : undefined;
-  if (!group || tab.windowId === undefined) return false;
+  const rule = host ? matchingRule(host, rules) : undefined;
+  if (!rule || tab.windowId === undefined) return false;
 
   const windowId = tab.windowId;
-  const groupId = await moveToGroup(tabId, windowId, group.name, group.color);
+  const groupId = await moveToGroup(tabId, windowId, rule.groupName, rule.color);
   return { groupId, previousGroupId: tab.groupId, windowId };
 }
 
@@ -70,7 +71,7 @@ export async function groupTab(tabId: number) {
   const settings = await getSettings();
   if (!settings.enabled) return false;
 
-  const result = await groupTabWithGroups(tabId, settings.groups);
+  const result = await groupTabWithRules(tabId, settings.rules);
   if (!result) return false;
 
   if (settings.collapseGroups && result.previousGroupId !== result.groupId) {
@@ -82,20 +83,20 @@ export async function groupTab(tabId: number) {
 export async function syncGroupName(groupId: number, name: string) {
   const settings = await getSettings();
   const tabs = await chrome.tabs.query({ groupId });
-  const group = tabs
+  const rule = tabs
     .map((tab) => {
       const host = hostname(tab.url);
-      return host ? matchingGroup(host, settings.groups) : undefined;
+      return host ? matchingRule(host, settings.rules) : undefined;
     })
     .find((candidate) => candidate);
   const nextName = name.trim();
 
-  if (!group || !nextName || nextName === group.name || settings.groups.some((item) => item.id !== group.id && item.name === nextName)) return false;
+  if (!rule || !nextName || nextName === rule.groupName || settings.rules.some((item) => item.groupName === nextName && item.groupName !== rule.groupName)) return false;
 
-  await saveSettings({ ...settings, groups: settings.groups.map((item) => item.id === group.id ? { ...item, name: nextName } : item) });
+  await saveSettings({ ...settings, rules: settings.rules.map((item) => item.groupName === rule.groupName ? { ...item, groupName: nextName } : item) });
   const existingGroups = await chrome.tabGroups.query({});
   await Promise.all(existingGroups
-    .filter((item) => item.title === group.name && item.id !== groupId)
+    .filter((item) => item.title === rule.groupName && item.id !== groupId)
     .map((item) => chrome.tabGroups.update(item.id, { title: nextName })));
   return true;
 }
@@ -117,7 +118,7 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
   const destinationGroupsByWindow = new Map<number, Set<number>>();
   const results = await Promise.allSettled(
     eligibleTabs.map(async (tab) => {
-      const result = await groupTabWithGroups(tab.id, settings.groups);
+      const result = await groupTabWithRules(tab.id, settings.rules);
       if (result) {
         if (result.previousGroupId !== result.groupId) {
           updatedWindowIds.add(result.windowId);
