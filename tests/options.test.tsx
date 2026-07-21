@@ -66,6 +66,14 @@ describe('OptionsApp interactions', () => {
     expect((screen.getByLabelText('匹配方式') as HTMLSelectElement).value).toBe('contains');
   });
 
+  it('uses a wrapping grid for match controls in a narrow dialog', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
+
+    expect(screen.getByLabelText('匹配字段').parentElement?.className).toContain('grid');
+  });
+
   it('creates a rule with multiple matching conditions', async () => {
     render(<OptionsApp />);
 

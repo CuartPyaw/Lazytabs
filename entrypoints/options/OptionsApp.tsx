@@ -286,7 +286,7 @@ export function OptionsApp() {
                     </Modal.Header>
                     <form onSubmit={(event) => { event.preventDefault(); void saveRule(); }}>
                       <Modal.Body className="mt-0 grid gap-4 px-4 py-5">
-                        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_144px]">
+                        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(144px,1fr))]">
                           <label className="grid gap-2 text-sm font-medium">规则名称
                             <Input aria-invalid={ruleNameError} className={`w-full rounded-md border border-default bg-default/35 px-3 shadow-none ${ruleNameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="描述你的规则" />
                           </label>
@@ -303,16 +303,18 @@ export function OptionsApp() {
                           <span>匹配规则</span>
                           <div className="grid gap-2">
                             {draft.conditions.map((condition, index) => (
-                              <div className="flex items-center gap-2" key={condition.id}>
+                              <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(132px,1fr))]" key={condition.id}>
                                 <select aria-label="匹配字段" className="h-10 w-36 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value as 'hostname' })}>
                                   <option value="hostname">域名部分</option>
                                 </select>
                                 <select aria-label="匹配方式" className="h-10 w-36 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.operator} onChange={(event) => updateCondition(index, { operator: event.target.value as RuleOperator })}>
                                   {Object.entries(operatorLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
-                                <Input aria-invalid={conditionError} aria-label="匹配值" className={`min-w-0 flex-1 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
-                                <button aria-label="添加匹配规则" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" type="button" onClick={() => setConditions([...draft.conditions, emptyCondition()])}><CirclePlus size={20} strokeWidth={2.1} /></button>
-                                {draft.conditions.length > 1 && <button aria-label={`删除第 ${index + 1} 条匹配规则`} className="grid size-5 shrink-0 place-items-center rounded-full bg-danger text-danger-foreground" type="button" onClick={() => setConditions(draft.conditions.filter((_, itemIndex) => itemIndex !== index))}><CircleMinus size={20} strokeWidth={2.1} /></button>}
+                                <Input aria-invalid={conditionError} aria-label="匹配值" className={`w-full min-w-0 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
+                                <div className="flex items-center gap-2">
+                                  <button aria-label="添加匹配规则" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" type="button" onClick={() => setConditions([...draft.conditions, emptyCondition()])}><CirclePlus size={20} strokeWidth={2.1} /></button>
+                                  {draft.conditions.length > 1 && <button aria-label={`删除第 ${index + 1} 条匹配规则`} className="grid size-5 shrink-0 place-items-center rounded-full bg-danger text-danger-foreground" type="button" onClick={() => setConditions(draft.conditions.filter((_, itemIndex) => itemIndex !== index))}><CircleMinus size={20} strokeWidth={2.1} /></button>}
+                                </div>
                               </div>
                             ))}
                           </div>
