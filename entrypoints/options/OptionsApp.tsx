@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Input, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
+import { Button, Card, Chip, Input, Modal, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
 import { ArrowLeft, Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -220,49 +220,7 @@ export function OptionsApp() {
             </Card.Content>
           </Card>}
 
-          {activeSection === 'groups' && (editorOpen ? (
-            <Card className="w-full max-w-lg">
-              <Card.Header className="flex items-center gap-3">
-                <Button size="sm" type="button" variant="tertiary" onPress={cancelEdit}><ArrowLeft size={17} strokeWidth={1.9} /> 返回</Button>
-                <Card.Title>{editingId ? '编辑分组' : '添加分组'}</Card.Title>
-              </Card.Header>
-              <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                <Card.Content className="grid gap-5">
-                  <label className="grid gap-2 text-sm font-medium">分组名称
-                    <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
-                  </label>
-                  <div className="grid gap-2 text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <span id="domain-rules-label">域名规则</span>
-                      <Chip size="sm" variant="soft">{ruleInputs.length} 条</Chip>
-                    </div>
-                    <div className="grid gap-2">
-                      {ruleInputs.map((value, index) => (
-                        <div className="flex items-center gap-2" key={index}>
-                          <Input aria-invalid={ruleError} aria-label="域名规则" className="w-full rounded-lg border border-default bg-default/35 px-4 shadow-none" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
-                          {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
-                        </div>
-                      ))}
-                    </div>
-                    <Button fullWidth size="sm" type="button" variant="secondary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /> 添加域名规则</Button>
-                    {error && <span className="text-sm font-normal text-danger">{error}</span>}
-                  </div>
-                  <div className="grid gap-2 text-sm font-medium">
-                    <span>标签组颜色</span>
-                    <div aria-label="标签组颜色" className="color-palette">
-                      {paletteColors.map((color) => (
-                        <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color }); setError(undefined); }} />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-1 flex justify-end gap-2 border-t border-default pt-4">
-                    <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
-                    <Button type="submit"><Check size={17} strokeWidth={2} />保存</Button>
-                  </div>
-                </Card.Content>
-              </form>
-            </Card>
-          ) : (
+          {activeSection === 'groups' && <>
             <Card>
               <Card.Header className="flex items-start justify-between gap-4">
                 <div>
@@ -300,7 +258,54 @@ export function OptionsApp() {
                 </div>}
               </Card.Content>
             </Card>
-          ))}
+            <Modal isOpen={editorOpen} onOpenChange={(isOpen) => { if (!isOpen) cancelEdit(); }}>
+              <Modal.Backdrop className="group-editor-backdrop">
+                <Modal.Container className="group-editor-container" placement="center" size="lg">
+                  <Modal.Dialog className="rounded-3xl p-3">
+                    <Modal.Header className="items-center gap-3">
+                      <Button size="sm" type="button" variant="tertiary" onPress={cancelEdit}><ArrowLeft size={17} strokeWidth={1.9} /> 返回</Button>
+                      <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
+                    </Modal.Header>
+                    <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                      <Modal.Body className="mt-4 grid gap-5">
+                        <label className="grid gap-2 text-sm font-medium">分组名称
+                          <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
+                        </label>
+                        <div className="grid gap-2 text-sm font-medium">
+                          <div className="flex items-center gap-2">
+                            <span id="domain-rules-label">域名规则</span>
+                            <Chip size="sm" variant="soft">{ruleInputs.length} 条</Chip>
+                          </div>
+                          <div className="grid gap-2">
+                            {ruleInputs.map((value, index) => (
+                              <div className="flex items-center gap-2" key={index}>
+                                <Input aria-invalid={ruleError} aria-label="域名规则" className="w-full rounded-lg border border-default bg-default/35 px-4 shadow-none" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
+                                {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
+                              </div>
+                            ))}
+                          </div>
+                          <Button fullWidth size="sm" type="button" variant="secondary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /> 添加域名规则</Button>
+                          {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                        </div>
+                        <div className="grid gap-2 text-sm font-medium">
+                          <span>标签组颜色</span>
+                          <div aria-label="标签组颜色" className="color-palette">
+                            {paletteColors.map((color) => (
+                              <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color }); setError(undefined); }} />
+                            ))}
+                          </div>
+                        </div>
+                      </Modal.Body>
+                      <Modal.Footer className="mt-5 border-t border-default pt-4">
+                        <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
+                        <Button type="submit"><Check size={17} strokeWidth={2} />保存</Button>
+                      </Modal.Footer>
+                    </form>
+                  </Modal.Dialog>
+                </Modal.Container>
+              </Modal.Backdrop>
+            </Modal>
+          </>}
         </div>
       </div>
     </main>

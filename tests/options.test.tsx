@@ -90,14 +90,13 @@ describe('OptionsApp interactions', () => {
     });
   });
 
-  it('opens the group editor in the settings content when the add button is clicked', async () => {
+  it('opens the group editor in a dialog when the add button is clicked', async () => {
     render(<OptionsApp />);
 
     const addButton = await screen.findByRole('button', { name: '添加分组' });
     fireEvent.click(addButton);
 
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByText('添加分组')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
   });
 

@@ -13,6 +13,14 @@ body {
 
 button { font: inherit; }
 
+.group-editor-backdrop[data-entering="true"],
+.group-editor-container[data-entering="true"] { animation: group-editor-fade-in 160ms ease-out; }
+.group-editor-backdrop[data-exiting="true"],
+.group-editor-container[data-exiting="true"] { animation: group-editor-fade-out 160ms ease-in; }
+
+@keyframes group-editor-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes group-editor-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
 .icon-button { display: inline-flex; align-items: center; justify-content: center; }
 .color-palette { display: flex; flex-wrap: wrap; gap: 8px; }
 .color-choice { width: 32px; height: 32px; border: 0; border-radius: 4px; background: var(--group-color); cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
@@ -92,8 +100,13 @@ button { font: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .group-editor-backdrop[data-entering="true"],
+  .group-editor-backdrop[data-exiting="true"],
+  .group-editor-container[data-entering="true"],
+  .group-editor-container[data-exiting="true"],
   .soft-switch .switch__control,
   .soft-switch .switch__thumb {
     transition: none;
+    animation: none;
   }
 }
