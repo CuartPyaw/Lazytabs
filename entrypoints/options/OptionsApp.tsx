@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, Modal, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
-import { ArrowLeft, Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
+import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup } from '../../src/lib/rules';
@@ -262,11 +262,11 @@ export function OptionsApp() {
               <Modal.Backdrop className="group-editor-backdrop">
                 <Modal.Container className="group-editor-container" placement="center" size="lg">
                   <Modal.Dialog className="rounded-3xl p-3">
-                    <Modal.Header className="items-center gap-3">
-                      <Button size="sm" type="button" variant="tertiary" onPress={cancelEdit}><ArrowLeft size={17} strokeWidth={1.9} /> 返回</Button>
-                      <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
-                    </Modal.Header>
-                    <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                    <form onKeyDown={(event) => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.preventDefault(); }} onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                      <Modal.Header className="items-center justify-between gap-3">
+                        <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
+                        <Button size="sm" type="submit"><Check size={16} strokeWidth={2} />确认</Button>
+                      </Modal.Header>
                       <Modal.Body className="mt-4 grid gap-5">
                         <label className="grid gap-2 text-sm font-medium">分组名称
                           <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />

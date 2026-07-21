@@ -98,6 +98,8 @@ describe('OptionsApp interactions', () => {
 
     expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '返回' })).toBeNull();
+    expect(screen.getByRole('button', { name: '确认' })).toBeTruthy();
   });
 
   it('preserves the latest automatic grouping state when a group is saved', async () => {
@@ -169,7 +171,7 @@ describe('OptionsApp interactions', () => {
     fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
     fireEvent.click(screen.getByRole('button', { name: '添加域名规则' }));
     fireEvent.change(screen.getAllByLabelText('域名规则')[1], { target: { value: 'docs.example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认' }));
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({
@@ -219,5 +221,14 @@ describe('OptionsApp interactions', () => {
         },
       });
     });
+  });
+
+  it('keeps the editor open when Enter is pressed in an input', async () => {
+    render(<OptionsApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
+    expect(fireEvent.keyDown(screen.getByLabelText('域名规则'), { key: 'Enter' })).toBe(false);
+    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
+    expect(storageSet).not.toHaveBeenCalled();
   });
 });
