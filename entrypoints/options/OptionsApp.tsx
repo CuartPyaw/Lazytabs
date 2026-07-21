@@ -310,7 +310,7 @@ export function OptionsApp() {
                           <span>匹配规则</span>
                           <div className="grid gap-2">
                             {draft.conditions.map((condition, index) => (
-                              <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(132px,1fr))]" key={condition.id}>
+                              <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(192px,1fr))]" key={condition.id}>
                                 <select aria-label="匹配字段" className="h-10 w-48 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value as RuleField })}>
                                   {Object.entries(fieldLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>

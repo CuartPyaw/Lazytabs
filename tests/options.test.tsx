@@ -73,7 +73,7 @@ describe('OptionsApp interactions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
 
-    expect(screen.getByLabelText('匹配字段').parentElement?.className).toContain('grid');
+    expect(screen.getByLabelText('匹配字段').parentElement?.className).toContain('minmax(192px,1fr)');
   });
 
   it('creates a rule with one matching condition', async () => {
