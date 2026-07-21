@@ -32,6 +32,10 @@ pure rule and storage behavior in `src/lib/` rather than UI components. Use
 Tailwind utilities for component layout and add shared CSS only to
 `src/styles.css`.
 
+## UI Framework
+
+All plugin UI must use HeroUI V3.
+
 ## Testing Guidelines
 
 Tests use Vitest's `describe`, `it`, and `expect`. Name test files
