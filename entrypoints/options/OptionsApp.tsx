@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Input, Modal, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
+import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -301,9 +301,12 @@ export function OptionsApp() {
                             <Input aria-invalid={groupNameError} className={`w-full rounded-md border border-default bg-default/35 px-3 shadow-none ${groupNameError ? 'border-danger' : ''}`} value={draft.groupName} onChange={(event) => { setDraft({ ...draft, groupName: event.target.value }); setError(undefined); }} placeholder="一个尽量短的名字" />
                           </label>
                           <label className="grid gap-2 text-sm font-medium">分组颜色
-                            <select aria-label="分组颜色" className="h-10 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={draft.color} onChange={(event) => { setDraft({ ...draft, color: event.target.value as RuleColor }); setError(undefined); }}>
-                              {colorOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
+                            <Select aria-label="分组颜色" className="w-full" selectedKey={draft.color} onSelectionChange={(color) => {
+                              if (typeof color === 'string') { setDraft({ ...draft, color: color as RuleColor }); setError(undefined); }
+                            }}>
+                              <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+                              <Select.Popover><ListBox>{colorOptions.map((option) => <ListBox.Item id={option.value} key={option.value}>{option.label}</ListBox.Item>)}</ListBox></Select.Popover>
+                            </Select>
                           </label>
                         </div>
                         <div className="grid gap-2 text-sm font-medium">
@@ -311,12 +314,18 @@ export function OptionsApp() {
                           <div className="grid gap-2">
                             {draft.conditions.map((condition, index) => (
                               <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(192px,1fr))]" key={condition.id}>
-                                <select aria-label="匹配字段" className="h-10 w-48 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value as RuleField })}>
-                                  {Object.entries(fieldLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                                </select>
-                                <select aria-label="匹配方式" className="h-10 w-36 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.operator} onChange={(event) => updateCondition(index, { operator: event.target.value as RuleOperator })}>
-                                  {Object.entries(operatorLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                                </select>
+                                <Select aria-label="匹配字段" className="w-48 shrink-0" selectedKey={condition.field} onSelectionChange={(field) => {
+                                  if (typeof field === 'string') updateCondition(index, { field: field as RuleField });
+                                }}>
+                                  <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+                                  <Select.Popover><ListBox>{Object.entries(fieldLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover>
+                                </Select>
+                                <Select aria-label="匹配方式" className="w-36 shrink-0" selectedKey={condition.operator} onSelectionChange={(operator) => {
+                                  if (typeof operator === 'string') updateCondition(index, { operator: operator as RuleOperator });
+                                }}>
+                                  <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+                                  <Select.Popover><ListBox>{Object.entries(operatorLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover>
+                                </Select>
                                 <Input aria-invalid={conditionError} aria-label="匹配值" className={`w-full min-w-0 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
                               </div>
                             ))}

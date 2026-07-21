@@ -61,10 +61,11 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByRole('dialog', { name: '添加规则' })).toBeTruthy();
     expect(screen.getByLabelText('规则名称')).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
-    expect((screen.getByLabelText('分组颜色') as HTMLSelectElement).value).toBe('auto');
-    expect((screen.getByLabelText('匹配字段') as HTMLSelectElement).value).toBe('hostname');
-    expect([...screen.getByLabelText('匹配字段').querySelectorAll('option')].map((option) => option.textContent)).toEqual(['域名部分', '完整URL', '页面标题', '页面标题 (忽略大小写)']);
-    expect((screen.getByLabelText('匹配方式') as HTMLSelectElement).value).toBe('contains');
+    expect(screen.getByLabelText('分组颜色').tagName).toBe('BUTTON');
+    expect(screen.getByLabelText('匹配字段').textContent).toContain('域名部分');
+    expect(screen.getByLabelText('匹配方式').textContent).toContain('包含');
+    fireEvent.click(screen.getByLabelText('匹配字段'));
+    expect(screen.getByRole('option', { name: '页面标题 (忽略大小写)' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '添加匹配规则' })).toBeNull();
   });
 
@@ -73,15 +74,17 @@ describe('OptionsApp interactions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
 
-    expect(screen.getByLabelText('匹配字段').parentElement?.className).toContain('minmax(192px,1fr)');
+    expect(screen.getByLabelText('匹配字段').parentElement?.parentElement?.className).toContain('minmax(192px,1fr)');
   });
 
-  it('creates a rule with one matching condition', async () => {
+  it('creates a rule with a selected matching condition', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
     fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '代码托管' } });
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
+    fireEvent.click(screen.getByLabelText('匹配字段'));
+    fireEvent.click(screen.getByRole('option', { name: '完整URL' }));
     fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'github' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
@@ -97,7 +100,7 @@ describe('OptionsApp interactions', () => {
             color: 'auto',
             enabled: true,
             conditions: [
-              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' },
+              { id: expect.any(String), field: 'url', operator: 'contains', value: 'github' },
             ],
           },
         ],
