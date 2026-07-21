@@ -97,6 +97,7 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(addButton);
 
     expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
+    expect(document.activeElement).not.toBe(screen.getByLabelText('分组名称'));
   });
 
   it('preserves the latest automatic grouping state when a group is saved', async () => {

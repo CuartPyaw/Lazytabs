@@ -276,15 +276,17 @@ export function OptionsApp() {
                   <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
                     <Modal.Body className="grid gap-5">
                       <label className="grid gap-2 text-sm font-medium">分组名称
-                        <Input autoFocus aria-invalid={nameError} className={`w-64 max-w-full ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
+                        <Input aria-invalid={nameError} className={`w-64 max-w-full rounded-full border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
                       </label>
                       <div className="grid gap-2 text-sm font-medium">
-                        <span id="domain-rules-label">域名规则</span>
+                        <div className="flex items-center gap-2">
+                          <span id="domain-rules-label">域名规则</span>
+                          <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /></Button>
+                        </div>
                         <div className="grid gap-2">
                           {ruleInputs.map((value, index) => (
-                            <div className="flex items-end gap-2" key={index}>
-                              <Input aria-invalid={ruleError} aria-label="域名规则" className="w-64 max-w-full" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
-                              {index === 0 && <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /></Button>}
+                            <div className="flex items-center gap-2" key={index}>
+                              <Input aria-invalid={ruleError} aria-label="域名规则" className="w-64 max-w-full rounded-full border border-default bg-default/35 px-4 shadow-none" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
                               {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
                             </div>
                           ))}
