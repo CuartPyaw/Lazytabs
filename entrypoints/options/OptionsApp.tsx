@@ -1,5 +1,5 @@
-import { Button, Card, Chip, Input, Modal, Popover, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
+import { Button, Card, Chip, Input, Radio, RadioGroup, Skeleton, Switch, useTheme } from '@heroui/react';
+import { ArrowLeft, Check, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { type Group, type GroupColor, type GroupInput, splitPatterns, validateGroup } from '../../src/lib/rules';
@@ -23,7 +23,6 @@ export function OptionsApp() {
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
   const [ruleInputs, setRuleInputs] = useState<string[]>(['']);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
@@ -95,7 +94,6 @@ export function OptionsApp() {
     setEditingId(group.id);
     setEditorOpen(true);
     setRuleInputs(patterns);
-    setPaletteOpen(false);
     setError(undefined);
   }
 
@@ -104,7 +102,6 @@ export function OptionsApp() {
     setEditingId(undefined);
     setEditorOpen(true);
     setRuleInputs(['']);
-    setPaletteOpen(false);
     setError(undefined);
   }
 
@@ -223,96 +220,87 @@ export function OptionsApp() {
             </Card.Content>
           </Card>}
 
-          {activeSection === 'groups' && <Card>
-            <Card.Header className="flex items-start justify-between gap-4">
-              <div>
-                <Card.Title>分组规则</Card.Title>
-                <Card.Description>每个分组可包含多条域名规则。</Card.Description>
-              </div>
-              <Button size="sm" onPress={beginCreate}><Plus size={17} strokeWidth={1.9} /> 添加分组</Button>
-            </Card.Header>
-            <Card.Content>
-              {!loaded && <div className="grid gap-3"><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div>}
-              {loaded && settings.groups.length === 0 && (
-                <div className="grid place-items-center py-12 text-center">
-                  <span className="grid size-11 place-items-center rounded-xl bg-default text-muted"><Globe2 size={21} strokeWidth={1.7} /></span>
-                  <p className="mb-0 mt-4 font-medium">还没有分组</p>
-                  <p className="mb-0 mt-1 text-sm text-muted">添加分组和域名规则开始自动整理。</p>
-                </div>
-              )}
-              {loaded && settings.groups.length > 0 && <div className="divide-y divide-default border-y border-default">
-                {settings.groups.map((group) => (
-                  <div className="flex min-h-20 flex-wrap items-center gap-4 py-3" key={group.id}>
-                    <Switch aria-label={`启用 ${group.name}`} className="soft-switch" isSelected={group.enabled} onChange={() => void toggleGroup(group)}>
-                      <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
-                    </Switch>
-                    <div className="min-w-48 flex-1">
-                      <p className="m-0 text-sm font-medium">{group.name}</p>
-                      <p className="m-0 mt-1 text-sm text-muted">{group.rules.map((rule) => rule.pattern).join('、')}</p>
+          {activeSection === 'groups' && (editorOpen ? (
+            <Card>
+              <Card.Header className="flex items-center gap-3">
+                <Button size="sm" type="button" variant="tertiary" onPress={cancelEdit}><ArrowLeft size={17} strokeWidth={1.9} /> 返回</Button>
+                <Card.Title>{editingId ? '编辑分组' : '添加分组'}</Card.Title>
+              </Card.Header>
+              <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                <Card.Content className="grid gap-5">
+                  <label className="grid gap-2 text-sm font-medium">分组名称
+                    <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
+                  </label>
+                  <div className="grid gap-2 text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <span id="domain-rules-label">域名规则</span>
+                      <Chip size="sm" variant="soft">{ruleInputs.length} 条</Chip>
                     </div>
-                    <Chip size="sm" variant="soft"><span className={`group-swatch mr-1.5 inline-block size-2 rounded-full color-${group.color}`} />{group.rules.length} 条规则</Chip>
-                    <div className="ml-auto flex gap-1">
-                      <Button isIconOnly aria-label={`编辑 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginEdit(group)}><Pencil size={16} strokeWidth={1.8} /></Button>
-                      <Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void removeGroup(group.id)}><Trash2 size={16} strokeWidth={1.8} /></Button>
+                    <div className="grid gap-2">
+                      {ruleInputs.map((value, index) => (
+                        <div className="flex items-center gap-2" key={index}>
+                          <Input aria-invalid={ruleError} aria-label="域名规则" className="w-full rounded-lg border border-default bg-default/35 px-4 shadow-none" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
+                          {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
+                        </div>
+                      ))}
+                    </div>
+                    <Button fullWidth size="sm" type="button" variant="secondary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /> 添加域名规则</Button>
+                    {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                  </div>
+                  <div className="grid gap-2 text-sm font-medium">
+                    <span>标签组颜色</span>
+                    <div aria-label="标签组颜色" className="color-palette">
+                      {paletteColors.map((color) => (
+                        <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color }); setError(undefined); }} />
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>}
-            </Card.Content>
-          </Card>}
-
-          <Modal isOpen={editorOpen} onOpenChange={(isOpen) => { if (!isOpen) cancelEdit(); }}>
-            <Modal.Backdrop className="group-editor-backdrop">
-              <Modal.Container className="group-editor-container" placement="center" size="md">
-                <Modal.Dialog>
-                  <Modal.Header>
-                    <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
-                  </Modal.Header>
-                  <form onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
-                    <Modal.Body className="grid gap-5">
-                      <label className="grid gap-2 text-sm font-medium">分组名称
-                        <Input aria-invalid={nameError} className={`w-64 max-w-full rounded-full border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
-                      </label>
-                      <div className="grid gap-2 text-sm font-medium">
-                        <div className="flex items-center gap-2">
-                          <span id="domain-rules-label">域名规则</span>
-                          <Button isIconOnly aria-label="添加域名规则" size="sm" type="button" variant="tertiary" onPress={() => setRules([...ruleInputs, ''])}><Plus size={16} strokeWidth={2} /></Button>
-                        </div>
-                        <div className="grid gap-2">
-                          {ruleInputs.map((value, index) => (
-                            <div className="flex items-center gap-2" key={index}>
-                              <Input aria-invalid={ruleError} aria-label="域名规则" className="w-64 max-w-full rounded-full border border-default bg-default/35 px-4 shadow-none" placeholder="example.com" value={value} onChange={(event) => setRules(ruleInputs.map((rule, itemIndex) => itemIndex === index ? event.target.value : rule))} />
-                              {ruleInputs.length > 1 && <Button isIconOnly aria-label={`删除第 ${index + 1} 条域名规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(ruleInputs.filter((_, itemIndex) => itemIndex !== index))}><X size={16} strokeWidth={2} /></Button>}
-                            </div>
-                          ))}
-                        </div>
-                        {error && <span className="text-sm font-normal text-danger">{error}</span>}
+                  <div className="mt-1 flex justify-end gap-2 border-t border-default pt-4">
+                    <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
+                    <Button type="submit"><Check size={17} strokeWidth={2} />保存</Button>
+                  </div>
+                </Card.Content>
+              </form>
+            </Card>
+          ) : (
+            <Card>
+              <Card.Header className="flex items-start justify-between gap-4">
+                <div>
+                  <Card.Title>分组规则</Card.Title>
+                  <Card.Description>每个分组可包含多条域名规则。</Card.Description>
+                </div>
+                <Button size="sm" onPress={beginCreate}><Plus size={17} strokeWidth={1.9} /> 添加分组</Button>
+              </Card.Header>
+              <Card.Content>
+                {!loaded && <div className="grid gap-3"><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div>}
+                {loaded && settings.groups.length === 0 && (
+                  <div className="grid place-items-center py-12 text-center">
+                    <span className="grid size-11 place-items-center rounded-xl bg-default text-muted"><Globe2 size={21} strokeWidth={1.7} /></span>
+                    <p className="mb-0 mt-4 font-medium">还没有分组</p>
+                    <p className="mb-0 mt-1 text-sm text-muted">添加分组和域名规则开始自动整理。</p>
+                  </div>
+                )}
+                {loaded && settings.groups.length > 0 && <div className="divide-y divide-default border-y border-default">
+                  {settings.groups.map((group) => (
+                    <div className="flex min-h-20 flex-wrap items-center gap-4 py-3" key={group.id}>
+                      <Switch aria-label={`启用 ${group.name}`} className="soft-switch" isSelected={group.enabled} onChange={() => void toggleGroup(group)}>
+                        <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
+                      </Switch>
+                      <div className="min-w-48 flex-1">
+                        <p className="m-0 text-sm font-medium">{group.name}</p>
+                        <p className="m-0 mt-1 text-sm text-muted">{group.rules.map((rule) => rule.pattern).join('、')}</p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <span>标签组颜色</span>
-                        <Popover isOpen={paletteOpen} onOpenChange={setPaletteOpen}>
-                          <Button isIconOnly aria-label="选择标签组颜色" size="sm" type="button" variant="tertiary"><Palette size={16} strokeWidth={2} /></Button>
-                          <Popover.Content placement="bottom start">
-                            <Popover.Dialog aria-label="标签组颜色">
-                              <div className="color-palette">
-                                {paletteColors.map((color) => (
-                                  <button key={color} aria-label={color} aria-pressed={draft.color === color} className={`color-choice color-${color}`} data-selected={draft.color === color} type="button" onClick={() => { setDraft({ ...draft, color }); setPaletteOpen(false); setError(undefined); }} />
-                                ))}
-                              </div>
-                            </Popover.Dialog>
-                          </Popover.Content>
-                        </Popover>
+                      <Chip size="sm" variant="soft"><span className={`group-swatch mr-1.5 inline-block size-2 rounded-full color-${group.color}`} />{group.rules.length} 条规则</Chip>
+                      <div className="ml-auto flex gap-1">
+                        <Button isIconOnly aria-label={`编辑 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginEdit(group)}><Pencil size={16} strokeWidth={1.8} /></Button>
+                        <Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void removeGroup(group.id)}><Trash2 size={16} strokeWidth={1.8} /></Button>
                       </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                      <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
-                      <Button type="submit"><Check size={17} strokeWidth={2} />完成</Button>
-                    </Modal.Footer>
-                  </form>
-                </Modal.Dialog>
-              </Modal.Container>
-            </Modal.Backdrop>
-          </Modal>
+                    </div>
+                  ))}
+                </div>}
+              </Card.Content>
+            </Card>
+          ))}
         </div>
       </div>
     </main>

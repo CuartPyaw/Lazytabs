@@ -90,14 +90,15 @@ describe('OptionsApp interactions', () => {
     });
   });
 
-  it('opens the group editor when the add button is clicked', async () => {
+  it('opens the group editor in the settings content when the add button is clicked', async () => {
     render(<OptionsApp />);
 
     const addButton = await screen.findByRole('button', { name: '添加分组' });
     fireEvent.click(addButton);
 
-    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
-    expect(document.activeElement).not.toBe(screen.getByLabelText('分组名称'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText('添加分组')).toBeTruthy();
+    expect(screen.getByLabelText('分组名称')).toBeTruthy();
   });
 
   it('preserves the latest automatic grouping state when a group is saved', async () => {
@@ -169,7 +170,7 @@ describe('OptionsApp interactions', () => {
     fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
     fireEvent.click(screen.getByRole('button', { name: '添加域名规则' }));
     fireEvent.change(screen.getAllByLabelText('域名规则')[1], { target: { value: 'docs.example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: '完成' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({
@@ -199,9 +200,8 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '阅读' } });
     fireEvent.change(screen.getByLabelText('域名规则'), { target: { value: 'example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: '选择标签组颜色' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'red' }));
-    fireEvent.click(screen.getByRole('button', { name: '完成' }));
+    fireEvent.click(screen.getByRole('button', { name: 'red' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => {
       expect(storageSet).toHaveBeenCalledWith({

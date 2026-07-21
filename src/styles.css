@@ -13,11 +13,8 @@ body {
 
 button { font: inherit; }
 
-.group-editor-backdrop[data-exiting="true"],
-.group-editor-container[data-exiting="true"] { animation-duration: 180ms; }
-
 .icon-button { display: inline-flex; align-items: center; justify-content: center; }
-.color-palette { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; width: max-content; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--foreground) 6%, transparent); }
+.color-palette { display: flex; flex-wrap: wrap; gap: 8px; }
 .color-choice { width: 32px; height: 32px; border: 0; border-radius: 4px; background: var(--group-color); cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; }
 .color-choice[data-selected="true"] { transform: scale(.84); box-shadow: 0 2px 5px color-mix(in srgb, var(--foreground) 24%, transparent); }
 .group-swatch { background: var(--group-color); }
