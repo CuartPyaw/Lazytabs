@@ -303,9 +303,6 @@ export function OptionsApp() {
                           </Popover.Content>
                         </Popover>
                       </div>
-                      <Switch aria-label="启用规则组" className="soft-switch" isSelected={draft.enabled} onChange={(enabled) => { setDraft({ ...draft, enabled }); setError(undefined); }}>
-                        <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>启用规则组</Switch.Content>
-                      </Switch>
                     </Modal.Body>
                     <Modal.Footer>
                       <Button type="button" variant="secondary" onPress={cancelEdit}>取消</Button>
