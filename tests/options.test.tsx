@@ -223,18 +223,35 @@ describe('OptionsApp interactions', () => {
     });
   });
 
-  it('submits the editor form when Enter is pressed in an input', async () => {
+  it('saves and exits the input without closing the editor when Enter is pressed', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
     const ruleInput = screen.getByLabelText('域名规则');
     fireEvent.change(ruleInput, { target: { value: 'example.com' } });
+    ruleInput.focus();
+    expect(document.activeElement).toBe(ruleInput);
     expect(fireEvent.keyDown(ruleInput, { key: 'Enter' })).toBe(false);
 
     await waitFor(() => {
-      expect(storageSet).toHaveBeenCalled();
+      expect(storageSet).toHaveBeenCalledWith({
+        settings: {
+          ...storedSettings,
+          groups: [
+            ...storedSettings.groups,
+            {
+              id: expect.any(String),
+              name: '工作',
+              color: 'blue',
+              enabled: true,
+              rules: [{ id: expect.any(String), pattern: 'example.com' }],
+            },
+          ],
+        },
+      });
     });
-    expect(screen.getByRole('dialog', { name: '编辑分组' })).toBeTruthy();
+    const dialog = screen.getByRole('dialog', { name: '编辑分组' });
+    expect(document.activeElement).toBe(dialog);
   });
 });

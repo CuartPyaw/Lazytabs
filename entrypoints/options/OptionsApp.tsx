@@ -266,7 +266,7 @@ export function OptionsApp() {
                     <Modal.Header className="items-center gap-3">
                       <Modal.Heading>{editingId ? '编辑分组' : '添加分组'}</Modal.Heading>
                     </Modal.Header>
-                    <form onKeyDown={(event) => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement) { event.preventDefault(); void saveGroup(false); } }} onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
+                    <form onKeyDown={(event) => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement) { event.preventDefault(); const dialog = event.currentTarget.closest<HTMLElement>('[role="dialog"]'); void saveGroup(false).then(() => dialog?.focus()); } }} onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}>
                       <Modal.Body className="mt-4 grid gap-5">
                         <label className="grid gap-2 text-sm font-medium">分组名称
                           <Input aria-invalid={nameError} className={`w-full rounded-lg border border-default bg-default/35 px-4 shadow-none ${nameError ? 'border-danger' : ''}`} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setError(undefined); }} placeholder="代码" />
