@@ -65,6 +65,7 @@ describe('OptionsApp interactions', () => {
     expect((screen.getByLabelText('匹配字段') as HTMLSelectElement).value).toBe('hostname');
     expect([...screen.getByLabelText('匹配字段').querySelectorAll('option')].map((option) => option.textContent)).toEqual(['域名部分', '完整URL', '页面标题', '页面标题 (忽略大小写)']);
     expect((screen.getByLabelText('匹配方式') as HTMLSelectElement).value).toBe('contains');
+    expect(screen.queryByRole('button', { name: '添加匹配规则' })).toBeNull();
   });
 
   it('uses a wrapping grid for match controls in a narrow dialog', async () => {
@@ -75,15 +76,13 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByLabelText('匹配字段').parentElement?.className).toContain('grid');
   });
 
-  it('creates a rule with multiple matching conditions', async () => {
+  it('creates a rule with one matching condition', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
     fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '代码托管' } });
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
     fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'github' } });
-    fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
-    fireEvent.change(screen.getAllByLabelText('匹配值')[1], { target: { value: 'gitlab' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
@@ -99,7 +98,6 @@ describe('OptionsApp interactions', () => {
             enabled: true,
             conditions: [
               { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' },
-              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' },
             ],
           },
         ],
