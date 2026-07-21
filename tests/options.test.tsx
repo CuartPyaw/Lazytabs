@@ -70,12 +70,12 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
   });
 
-  it('uses a wrapping grid for match controls in a narrow dialog', async () => {
+  it('places match controls at the end of the row', async () => {
     render(<OptionsApp />);
 
     fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
 
-    expect(screen.getByLabelText('匹配字段').parentElement?.parentElement?.className).toContain('minmax(192px,1fr)');
+    expect(screen.getByLabelText('匹配字段').parentElement?.parentElement?.className).toContain('grid-template-columns:12rem_9rem_minmax(0,1fr)_auto');
   });
 
   it('creates a rule with multiple matching conditions', async () => {

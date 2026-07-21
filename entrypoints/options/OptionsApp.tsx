@@ -313,7 +313,7 @@ export function OptionsApp() {
                           <span>匹配规则</span>
                           <div className="grid gap-2">
                             {draft.conditions.map((condition, index) => (
-                              <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(192px,1fr))]" key={condition.id}>
+                              <div className="grid grid-cols-1 items-center gap-2 sm:[grid-template-columns:12rem_9rem_minmax(0,1fr)_auto]" key={condition.id}>
                                 <Select aria-label="匹配字段" className="w-48 shrink-0" selectedKey={condition.field} onSelectionChange={(field) => {
                                   if (typeof field === 'string') updateCondition(index, { field: field as RuleField });
                                 }}>
@@ -327,7 +327,7 @@ export function OptionsApp() {
                                   <Select.Popover><ListBox>{Object.entries(operatorLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover>
                                 </Select>
                                 <Input aria-invalid={conditionError} aria-label="匹配值" className={`w-full min-w-0 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-self-end gap-2">
                                   <button aria-label="添加匹配规则" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" title="添加匹配规则" type="button" onClick={() => setConditions([...draft.conditions, emptyCondition()])}><CirclePlus size={20} strokeWidth={2.1} /></button>
                                   {draft.conditions.length > 1 && <button aria-label={`删除第 ${index + 1} 条匹配规则`} className="grid size-5 shrink-0 place-items-center rounded-full bg-danger text-danger-foreground" title="删除匹配规则" type="button" onClick={() => setConditions(draft.conditions.filter((_, itemIndex) => itemIndex !== index))}><CircleMinus size={20} strokeWidth={2.1} /></button>}
                                 </div>
