@@ -63,6 +63,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
     expect((screen.getByLabelText('分组颜色') as HTMLSelectElement).value).toBe('auto');
     expect((screen.getByLabelText('匹配字段') as HTMLSelectElement).value).toBe('hostname');
+    expect([...screen.getByLabelText('匹配字段').querySelectorAll('option')].map((option) => option.textContent)).toEqual(['域名部分', '完整URL', '页面标题', '页面标题 (忽略大小写)']);
     expect((screen.getByLabelText('匹配方式') as HTMLSelectElement).value).toBe('contains');
   });
 

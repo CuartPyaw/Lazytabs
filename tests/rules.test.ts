@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { conditionsOverlap, findRuleConflict, matchesCondition, matchingRule, validateCondition, validateRule } from '../src/lib/rules';
+import { conditionsOverlap, findRuleConflict, matchesCondition, matchingRule, validateCondition, validateRule, type RuleField } from '../src/lib/rules';
 
-const condition = (operator: 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'regex', value: string) => ({ id: `${operator}-${value}`, field: 'hostname' as const, operator, value });
+const condition = (operator: 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'regex', value: string, field: RuleField = 'hostname') => ({ id: `${field}-${operator}-${value}`, field, operator, value });
 
 describe('domain rules', () => {
   it('matches every supported operator without case sensitivity', () => {
-    expect(matchesCondition('Api.GitHub.com', condition('contains', 'github'))).toBe(true);
-    expect(matchesCondition('api.github.com', condition('startsWith', 'api.'))).toBe(true);
-    expect(matchesCondition('api.github.com', condition('endsWith', '.com'))).toBe(true);
-    expect(matchesCondition('api.github.com', condition('equals', 'API.GITHUB.COM'))).toBe(true);
-    expect(matchesCondition('api.github.com', condition('regex', '^api\\.github\\.com$'))).toBe(true);
+    const target = { hostname: 'Api.GitHub.com', url: 'https://github.com/Codex', title: 'Codex Guide' };
+
+    expect(matchesCondition(target, condition('contains', 'github'))).toBe(true);
+    expect(matchesCondition(target, condition('startsWith', 'api.'))).toBe(true);
+    expect(matchesCondition(target, condition('endsWith', '.com'))).toBe(true);
+    expect(matchesCondition(target, condition('equals', 'API.GITHUB.COM'))).toBe(true);
+    expect(matchesCondition(target, condition('regex', '^api\\.github\\.com$'))).toBe(true);
+    expect(matchesCondition(target, condition('contains', 'github.com/Codex', 'url'))).toBe(true);
+    expect(matchesCondition(target, condition('contains', 'codex', 'title'))).toBe(false);
+    expect(matchesCondition(target, condition('contains', 'codex', 'titleIgnoreCase'))).toBe(true);
   });
 
   it('matches a rule when any condition matches', () => {
@@ -23,8 +28,8 @@ describe('domain rules', () => {
       conditions: [condition('contains', 'github'), condition('contains', 'gitlab')],
     };
 
-    expect(matchingRule('gitlab.com', [rule])?.name).toBe('代码托管');
-    expect(matchingRule('example.com', [rule])).toBeUndefined();
+    expect(matchingRule({ hostname: 'gitlab.com' }, [rule])?.name).toBe('代码托管');
+    expect(matchingRule({ hostname: 'example.com' }, [rule])).toBeUndefined();
   });
 
   it('rejects blank and invalid regular-expression conditions', () => {

@@ -2,7 +2,7 @@ import { Button, Card, Chip, Input, Modal, Radio, RadioGroup, Skeleton, Switch, 
 import { Check, CircleMinus, CirclePlus, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { type MatchCondition, type Rule, type RuleColor, type RuleInput, type RuleOperator, validateRule } from '../../src/lib/rules';
+import { type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleInput, type RuleOperator, validateRule } from '../../src/lib/rules';
 import { getSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 
 const operatorLabels: Record<RuleOperator, string> = {
@@ -11,6 +11,13 @@ const operatorLabels: Record<RuleOperator, string> = {
   endsWith: '后缀为',
   equals: '完全相等',
   regex: '正则匹配',
+};
+
+const fieldLabels: Record<RuleField, string> = {
+  hostname: '域名部分',
+  url: '完整URL',
+  title: '页面标题',
+  titleIgnoreCase: '页面标题 (忽略大小写)',
 };
 
 const colorOptions: Array<{ value: RuleColor; label: string }> = [
@@ -45,7 +52,7 @@ function emptyRule(): RuleInput {
 }
 
 function describeConditions(conditions: MatchCondition[]) {
-  return conditions.map((condition) => `域名部分${operatorLabels[condition.operator]}“${condition.value}”`).join('；');
+  return conditions.map((condition) => `${fieldLabels[condition.field]}${operatorLabels[condition.operator]}“${condition.value}”`).join('；');
 }
 
 export function OptionsApp() {
@@ -304,8 +311,8 @@ export function OptionsApp() {
                           <div className="grid gap-2">
                             {draft.conditions.map((condition, index) => (
                               <div className="grid items-center gap-2 [grid-template-columns:repeat(auto-fit,minmax(132px,1fr))]" key={condition.id}>
-                                <select aria-label="匹配字段" className="h-10 w-36 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value as 'hostname' })}>
-                                  <option value="hostname">域名部分</option>
+                                <select aria-label="匹配字段" className="h-10 w-48 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value as RuleField })}>
+                                  {Object.entries(fieldLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                                 <select aria-label="匹配方式" className="h-10 w-36 shrink-0 rounded-md border border-default bg-default/35 px-3 text-sm font-normal outline-none focus:border-primary" value={condition.operator} onChange={(event) => updateCondition(index, { operator: event.target.value as RuleOperator })}>
                                   {Object.entries(operatorLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

@@ -50,8 +50,7 @@ async function groupTabWithRules(tabId: number, rules: Rule[]): Promise<GroupRes
   const tab = await chrome.tabs.get(tabId);
   if (tab.pinned || tab.incognito) return false;
 
-  const host = hostname(tab.url);
-  const rule = host ? matchingRule(host, rules) : undefined;
+  const rule = matchingRule({ hostname: hostname(tab.url), url: tab.url, title: tab.title }, rules);
   if (!rule || tab.windowId === undefined) return false;
 
   const windowId = tab.windowId;
@@ -85,8 +84,7 @@ export async function syncGroupName(groupId: number, name: string) {
   const tabs = await chrome.tabs.query({ groupId });
   const rule = tabs
     .map((tab) => {
-      const host = hostname(tab.url);
-      return host ? matchingRule(host, settings.rules) : undefined;
+      return matchingRule({ hostname: hostname(tab.url), url: tab.url, title: tab.title }, settings.rules);
     })
     .find((candidate) => candidate);
   const nextName = name.trim();
