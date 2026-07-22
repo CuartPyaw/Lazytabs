@@ -61,7 +61,7 @@ for popup or options UI changes.
 1. 检查并提交工作区更改。
 2. 推送到远端。
 3. 执行 `npm run build` 生成构建产物。
-4. 将 `.output/LazyTabs` 压缩为 `LazyTabs.zip`，并上传为 GitHub Release asset。
+4. 将 `.output/LazyTabs` 压缩为不带版本号的 `LazyTabs.zip`，并上传为 GitHub Release asset。
 
 ## Extension Boundaries
 
