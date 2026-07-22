@@ -56,6 +56,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByLabelText('分组颜色').tagName).toBe('BUTTON');
     expect(screen.getByLabelText('规则名称')).toBeTruthy();
     expect(screen.getByLabelText('规则 1 匹配字段').textContent).toContain('域名部分');
+    expect(screen.queryByRole('button', { name: '为第 1 条规则添加条件' })).toBeNull();
     expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
   });
 

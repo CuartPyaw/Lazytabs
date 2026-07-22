@@ -289,7 +289,6 @@ export function OptionsApp() {
                               <Input aria-invalid={conditionError} aria-label={`规则 ${ruleIndex + 1} 匹配值`} className={`w-full min-w-0 rounded-md border border-default bg-default/35 px-3 shadow-none ${conditionError ? 'border-danger' : ''}`} placeholder="例如 github" value={condition.value} onChange={(event) => updateCondition(ruleIndex, index, { value: event.target.value })} />
                               {rule.conditions.length > 1 && <button aria-label={`删除第 ${ruleIndex + 1} 条规则的第 ${index + 1} 个条件`} className="grid size-5 shrink-0 place-items-center justify-self-end rounded-full bg-danger text-danger-foreground" title="删除匹配条件" type="button" onClick={() => setConditions(ruleIndex, rule.conditions.filter((_, itemIndex) => itemIndex !== index))}><CircleMinus size={20} strokeWidth={2.1} /></button>}
                             </div>)}
-                            <Button aria-label={`为第 ${ruleIndex + 1} 条规则添加条件`} className="justify-self-start" size="sm" type="button" onPress={() => setConditions(ruleIndex, [...rule.conditions, emptyCondition()])}>添加条件</Button>
                           </section>)}
                           <Button aria-label="添加匹配规则" className="justify-self-start" size="sm" type="button" variant="secondary" onPress={() => setRules([...draft.rules, emptyRule()])}>添加规则</Button>
                           {error && <span className="text-sm text-danger">{error}</span>}
