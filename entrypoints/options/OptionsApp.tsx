@@ -332,7 +332,6 @@ export function OptionsApp() {
                             ))}
                             <Button aria-label="添加匹配规则" className="justify-self-start" size="sm" type="button" onPress={() => setConditions([...draft.conditions, emptyCondition()])}>添加规则</Button>
                           </div>
-                          <p className="m-0 text-sm font-normal text-muted">任一条件匹配后，标签页会自动加入这个分组。</p>
                           {error && <span className="text-sm font-normal text-danger">{error}</span>}
                         </div>
                       </Modal.Body>
