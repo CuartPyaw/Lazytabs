@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getSettings } from '../src/lib/settings';
+import { getSettings, parseImportedSettings } from '../src/lib/settings';
 
 describe('settings', () => {
   const get = vi.fn();
@@ -42,5 +42,16 @@ describe('settings', () => {
     await expect(getSettings()).resolves.toMatchObject({
       groups: [{ id: 'github', name: '代码', color: 'green', enabled: true, rules: [{ id: 'github', name: 'github.com' }] }],
     });
+  });
+
+  it('accepts complete imported settings and rejects invalid configurations', () => {
+    const settings = {
+      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system',
+      groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }] }],
+    } as const;
+
+    expect(parseImportedSettings(settings)).toEqual(settings);
+    expect(parseImportedSettings({ ...settings, groups: [{ ...settings.groups[0], rules: [] }] })).toBeUndefined();
+    expect(parseImportedSettings({ ...settings, theme: 'violet' })).toBeUndefined();
   });
 });

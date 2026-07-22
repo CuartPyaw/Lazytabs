@@ -86,4 +86,16 @@ describe('OptionsApp interactions', () => {
       },
     }));
   });
+
+  it('replaces settings only after confirming a valid import', async () => {
+    const importedSettings = { ...storedSettings, theme: 'dark' as const, groups: [] };
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
+
+    expect(await screen.findByRole('dialog', { name: '导入数据' })).toBeTruthy();
+    expect(storageSet).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: importedSettings }));
+  });
 });

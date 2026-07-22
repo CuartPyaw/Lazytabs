@@ -1,4 +1,4 @@
-import type { Group, GroupColor, MatchCondition, Rule } from './rules';
+import { GROUP_COLORS, MATCH_FIELDS, MATCH_OPERATORS, type Group, type GroupColor, type MatchCondition, type Rule } from './rules';
 
 export type Settings = {
   enabled: boolean;
@@ -101,4 +101,32 @@ export async function getSettings(): Promise<Settings> {
 
 export async function saveSettings(settings: Settings) {
   await chrome.storage.local.set({ [settingsKey]: settings });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function parseImportedSettings(value: unknown): Settings | undefined {
+  if (!isRecord(value) || typeof value.enabled !== 'boolean' || typeof value.collapseGroups !== 'boolean' || typeof value.organizeAllWindows !== 'boolean' || !['light', 'dark', 'system'].includes(value.theme as Theme) || !Array.isArray(value.groups)) return undefined;
+
+  const groupIds = new Set<string>();
+  const ruleIds = new Set<string>();
+  const conditionIds = new Set<string>();
+  const groupNames = new Set<string>();
+  for (const group of value.groups) {
+    if (!isRecord(group) || typeof group.id !== 'string' || !group.id || groupIds.has(group.id) || typeof group.name !== 'string' || !group.name.trim() || groupNames.has(group.name) || !GROUP_COLORS.includes(group.color as GroupColor) || typeof group.enabled !== 'boolean' || !Array.isArray(group.rules) || !group.rules.length) return undefined;
+    groupIds.add(group.id);
+    groupNames.add(group.name);
+    for (const rule of group.rules) {
+      if (!isRecord(rule) || typeof rule.id !== 'string' || !rule.id || ruleIds.has(rule.id) || typeof rule.name !== 'string' || !Array.isArray(rule.conditions) || !rule.conditions.length) return undefined;
+      ruleIds.add(rule.id);
+      for (const condition of rule.conditions) {
+        if (!isRecord(condition) || typeof condition.id !== 'string' || !condition.id || conditionIds.has(condition.id) || !MATCH_FIELDS.includes(condition.field as MatchCondition['field']) || !MATCH_OPERATORS.includes(condition.operator as MatchCondition['operator']) || typeof condition.value !== 'string' || !condition.value.trim()) return undefined;
+        if (condition.operator === 'regex') try { new RegExp(condition.value); } catch { return undefined; }
+        conditionIds.add(condition.id);
+      }
+    }
+  }
+  return value as Settings;
 }

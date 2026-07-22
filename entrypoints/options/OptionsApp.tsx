@@ -1,9 +1,9 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, CircleMinus, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, CircleMinus, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
-import { getSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
+import { getSettings, parseImportedSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 import { syncGroup } from '../../src/lib/tab-groups';
 
 const operatorLabels: Record<RuleOperator, string> = {
@@ -67,7 +67,11 @@ export function OptionsApp() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();
+  const [importedSettings, setImportedSettings] = useState<Settings>();
+  const [importOpen, setImportOpen] = useState(false);
+  const [transferMessage, setTransferMessage] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
+  const importInput = useRef<HTMLInputElement>(null);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -124,6 +128,37 @@ export function OptionsApp() {
     const next = { ...currentSettings, organizeAllWindows };
     setSettings(next);
     await saveSettings(next);
+  }
+
+  function exportSettings() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'lazytabs.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadImport(file?: File) {
+    if (!file) return;
+    try {
+      const nextSettings = parseImportedSettings(JSON.parse(await file.text()));
+      if (!nextSettings) throw new Error();
+      setImportedSettings(nextSettings);
+      setImportOpen(true);
+      setTransferMessage(undefined);
+    } catch {
+      setTransferMessage('文件不是有效的 LazyTabs 配置。');
+    }
+  }
+
+  async function confirmImport() {
+    if (!importedSettings) return;
+    await saveSettings(importedSettings);
+    setSettings(importedSettings);
+    setImportedSettings(undefined);
+    setImportOpen(false);
+    setTransferMessage('设置已导入。');
   }
 
   async function toggleGroup(group: Group) {
@@ -232,8 +267,26 @@ export function OptionsApp() {
             <Card.Content className="grid gap-5">
               <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后自动折叠</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
+              <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
+                <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出数据</Button>
+                <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => importInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入数据</Button>
+                <input ref={importInput} accept=".json,application/json" className="sr-only" type="file" onChange={(event) => { void loadImport(event.target.files?.[0]); event.target.value = ''; }} />
+                {transferMessage && <span className={transferMessage === '设置已导入。' ? 'text-sm text-success' : 'text-sm text-danger'}>{transferMessage}</span>}
+              </div>
             </Card.Content>
           </Card>}
+
+          <Modal isOpen={importOpen} onOpenChange={(isOpen) => { if (!isOpen) setImportOpen(false); }}>
+            <Modal.Backdrop className="group-editor-backdrop">
+              <Modal.Container className="group-editor-container" placement="center" size="sm">
+                <Modal.Dialog className="w-full rounded-lg p-0">
+                  <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>导入数据</Modal.Heading></Modal.Header>
+                  <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换全部当前设置，包括分组、通用选项和主题。</Modal.Body>
+                  <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setImportOpen(false)}>取消</Button><Button onPress={() => void confirmImport()}><Upload size={17} strokeWidth={2} />确认导入</Button></Modal.Footer>
+                </Modal.Dialog>
+              </Modal.Container>
+            </Modal.Backdrop>
+          </Modal>
 
           {activeSection === 'appearance' && <Card>
             <Card.Header><div><Card.Title>外观</Card.Title><Card.Description>调整扩展的显示主题。</Card.Description></div></Card.Header>
