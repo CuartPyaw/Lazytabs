@@ -19,6 +19,7 @@ const storedSettings = {
 const storageSet = vi.fn();
 const storageGet = vi.fn();
 const storageChanged = { addListener: vi.fn(), removeListener: vi.fn() };
+const fetchLatestRelease = vi.fn();
 
 beforeEach(() => {
   storageSet.mockReset();
@@ -26,11 +27,14 @@ beforeEach(() => {
   storageGet.mockResolvedValue({ settings: storedSettings });
   storageChanged.addListener.mockReset();
   storageChanged.removeListener.mockReset();
+  fetchLatestRelease.mockReset();
+  vi.stubGlobal('fetch', fetchLatestRelease);
   vi.stubGlobal('chrome', {
     storage: {
       local: { get: storageGet, set: storageSet.mockResolvedValue(undefined) },
       onChanged: storageChanged,
     },
+    runtime: { getManifest: () => ({ version: '1.0.1' }) },
   });
 });
 
@@ -97,5 +101,16 @@ describe('OptionsApp interactions', () => {
     expect(storageSet).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: importedSettings }));
+  });
+
+  it('shows a newer GitHub release', async () => {
+    fetchLatestRelease.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ tag_name: 'v1.0.2', html_url: 'https://github.com/CuartPyaw/Lazytabs/releases/tag/v1.0.2' }) });
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
+    fireEvent.click(screen.getByRole('button', { name: '检查更新' }));
+
+    expect(await screen.findByRole('dialog', { name: '发现新版本' })).toBeTruthy();
+    expect(screen.getByText('新版本：v1.0.2')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'GitHub Release' }).getAttribute('href')).toBe('https://github.com/CuartPyaw/Lazytabs/releases/tag/v1.0.2');
   });
 });

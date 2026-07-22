@@ -8,6 +8,7 @@ export default defineConfig({
     name: 'LazyTabs',
     description: 'Automatically group Chrome tabs by domain rules.',
     permissions: ['storage', 'tabs', 'tabGroups'],
+    host_permissions: ['https://api.github.com/*'],
     action: { default_title: 'LazyTabs' },
     commands: {
       'organize-current-window': {

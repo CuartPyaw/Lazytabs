@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, CircleMinus, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, Settings2, Trash2, Upload } from 'lucide-react';
+import { Check, CircleMinus, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
@@ -40,6 +40,19 @@ const themeOptions: { value: Theme; label: string }[] = [
   { value: 'dark', label: '深色' },
 ];
 
+const latestReleaseUrl = 'https://api.github.com/repos/CuartPyaw/Lazytabs/releases/latest';
+
+function isNewerVersion(latestVersion: string, currentVersion: string) {
+  const latest = latestVersion.replace(/^v/, '').split('.').map(Number);
+  const current = currentVersion.split('.').map(Number);
+  if ([...latest, ...current].some(Number.isNaN)) return false;
+
+  for (let index = 0; index < Math.max(latest.length, current.length); index += 1) {
+    if ((latest[index] ?? 0) !== (current[index] ?? 0)) return (latest[index] ?? 0) > (current[index] ?? 0);
+  }
+  return false;
+}
+
 function nextId() {
   return crypto.randomUUID();
 }
@@ -69,6 +82,9 @@ export function OptionsApp() {
   const [error, setError] = useState<string>();
   const [importedSettings, setImportedSettings] = useState<Settings>();
   const [importOpen, setImportOpen] = useState(false);
+  const [availableRelease, setAvailableRelease] = useState<{ version: string; url: string }>();
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string>();
   const [transferMessage, setTransferMessage] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
   const importInput = useRef<HTMLInputElement>(null);
@@ -159,6 +175,26 @@ export function OptionsApp() {
     setImportedSettings(undefined);
     setImportOpen(false);
     setTransferMessage('设置已导入。');
+  }
+
+  async function checkForUpdates() {
+    setCheckingUpdate(true);
+    setUpdateMessage(undefined);
+    try {
+      const response = await fetch(latestReleaseUrl);
+      const release = await response.json() as { tag_name?: unknown; html_url?: unknown };
+      if (!response.ok || typeof release.tag_name !== 'string' || typeof release.html_url !== 'string') throw new Error();
+
+      if (isNewerVersion(release.tag_name, chrome.runtime.getManifest().version)) {
+        setAvailableRelease({ version: release.tag_name, url: release.html_url });
+      } else {
+        setUpdateMessage('已是最新版本。');
+      }
+    } catch {
+      setUpdateMessage('检查更新失败。');
+    } finally {
+      setCheckingUpdate(false);
+    }
   }
 
   async function toggleGroup(group: Group) {
@@ -270,8 +306,10 @@ export function OptionsApp() {
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
                 <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出数据</Button>
                 <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => importInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入数据</Button>
+                <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>
                 <input ref={importInput} accept=".json,application/json" className="sr-only" type="file" onChange={(event) => { void loadImport(event.target.files?.[0]); event.target.value = ''; }} />
                 {transferMessage && <span className={transferMessage === '设置已导入。' ? 'text-sm text-success' : 'text-sm text-danger'}>{transferMessage}</span>}
+                {updateMessage && <span className="text-sm text-muted">{updateMessage}</span>}
               </div>
             </Card.Content>
           </Card>}
@@ -283,6 +321,18 @@ export function OptionsApp() {
                   <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>导入数据</Modal.Heading></Modal.Header>
                   <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换全部当前设置，包括分组、通用选项和主题。</Modal.Body>
                   <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setImportOpen(false)}>取消</Button><Button onPress={() => void confirmImport()}><Upload size={17} strokeWidth={2} />确认导入</Button></Modal.Footer>
+                </Modal.Dialog>
+              </Modal.Container>
+            </Modal.Backdrop>
+          </Modal>
+
+          <Modal isOpen={Boolean(availableRelease)} onOpenChange={(isOpen) => { if (!isOpen) setAvailableRelease(undefined); }}>
+            <Modal.Backdrop className="group-editor-backdrop">
+              <Modal.Container className="group-editor-container" placement="center" size="sm">
+                <Modal.Dialog className="w-full rounded-lg p-0">
+                  <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>发现新版本</Modal.Heading></Modal.Header>
+                  <Modal.Body className="mt-0 grid gap-3 px-4 py-5 text-sm text-muted"><span>新版本：{availableRelease?.version}</span>{availableRelease && <a className="w-fit font-medium text-primary hover:underline" href={availableRelease.url} rel="noreferrer" target="_blank">GitHub Release</a>}</Modal.Body>
+                  <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setAvailableRelease(undefined)}>关闭</Button></Modal.Footer>
                 </Modal.Dialog>
               </Modal.Container>
             </Modal.Backdrop>
