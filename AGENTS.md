@@ -54,6 +54,15 @@ Pull requests should explain the user-visible behavior, link the relevant
 issue when available, list validation commands run, and include screenshots
 for popup or options UI changes.
 
+## Release 发布流程
+
+发布 Release 时，按以下顺序执行：
+
+1. 检查并提交工作区更改。
+2. 推送到远端。
+3. 执行 `npm run build` 生成构建产物。
+4. 将 `.output/LazyTabs` 压缩为 `LazyTabs.zip`，并上传为 GitHub Release asset。
+
 ## Extension Boundaries
 
 The manifest grants `storage`, `tabs`, and `tabGroups` permissions. Treat
