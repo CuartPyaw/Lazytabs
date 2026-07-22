@@ -100,8 +100,7 @@ export function OptionsApp() {
   }, [setTheme, settings.theme]);
 
   const groupNameError = error === '请输入分组名称。' || error === '分组名称已存在。';
-  const ruleNameError = error === '请输入规则名称。';
-  const conditionError = Boolean(error && !groupNameError && !ruleNameError);
+  const conditionError = Boolean(error && !groupNameError);
 
   async function updateSettings(groups: Group[]) {
     const currentSettings = await getSettings();
@@ -188,7 +187,7 @@ export function OptionsApp() {
       rules: draft.rules.map((rule) => ({
         ...rule,
         id: rule.id || nextId(),
-        name: rule.name.trim(),
+        name: rule.name.trim() || rule.conditions[0]?.value.trim() || '',
         conditions: rule.conditions.map((condition) => ({ ...condition, id: condition.id || nextId(), value: condition.value.trim() })),
       })),
     };
@@ -282,7 +281,7 @@ export function OptionsApp() {
                         <div className="grid gap-3">
                           <span className="text-sm font-medium">匹配规则</span>
                           {draft.rules.map((rule, ruleIndex) => <section className="grid gap-3 border-t border-default pt-4" key={rule.id}>
-                            <div className="flex items-end gap-3"><label className="grid flex-1 gap-2 text-sm font-medium">规则名称<Input aria-invalid={ruleNameError} className={`w-full rounded-md border border-default bg-default/35 px-3 shadow-none ${ruleNameError ? 'border-danger' : ''}`} value={rule.name} onChange={(event) => updateRule(ruleIndex, { name: event.target.value })} placeholder="描述匹配目标" /></label>{draft.rules.length > 1 && <Button isIconOnly aria-label={`删除 ${rule.name || `第 ${ruleIndex + 1} 条规则`}`} size="sm" type="button" variant="tertiary" onPress={() => setRules(draft.rules.filter((_, index) => index !== ruleIndex))}><Trash2 size={16} strokeWidth={1.8} /></Button>}</div>
+                            {draft.rules.length > 1 && <div className="flex justify-end"><Button isIconOnly aria-label={`删除第 ${ruleIndex + 1} 条规则`} size="sm" type="button" variant="tertiary" onPress={() => setRules(draft.rules.filter((_, index) => index !== ruleIndex))}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
                             {rule.conditions.map((condition, index) => <div className="grid grid-cols-1 items-center gap-2 sm:[grid-template-columns:12rem_9rem_minmax(0,1fr)_auto]" key={condition.id}>
                               <Select aria-label={`规则 ${ruleIndex + 1} 匹配字段`} className="w-48 shrink-0" selectedKey={condition.field} onSelectionChange={(field) => { if (typeof field === 'string') updateCondition(ruleIndex, index, { field: field as RuleField }); }}><Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox>{Object.entries(fieldLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover></Select>
                               <Select aria-label={`规则 ${ruleIndex + 1} 匹配方式`} className="w-36 shrink-0" selectedKey={condition.operator} onSelectionChange={(operator) => { if (typeof operator === 'string') updateCondition(ruleIndex, index, { operator: operator as RuleOperator }); }}><Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox>{Object.entries(operatorLabels).map(([value, label]) => <ListBox.Item id={value} key={value}>{label}</ListBox.Item>)}</ListBox></Select.Popover></Select>

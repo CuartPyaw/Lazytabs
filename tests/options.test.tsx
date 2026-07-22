@@ -54,7 +54,7 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
     expect(screen.getByLabelText('分组颜色').tagName).toBe('BUTTON');
-    expect(screen.getByLabelText('规则名称')).toBeTruthy();
+    expect(screen.queryByLabelText('规则名称')).toBeNull();
     expect(screen.getByLabelText('规则 1 匹配字段').textContent).toContain('域名部分');
     expect(screen.queryByRole('button', { name: '为第 1 条规则添加条件' })).toBeNull();
     expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
@@ -64,10 +64,8 @@ describe('OptionsApp interactions', () => {
     render(<OptionsApp />);
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
-    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: 'GitHub' } });
     fireEvent.change(screen.getByLabelText('规则 1 匹配值'), { target: { value: 'github' } });
     fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
-    fireEvent.change(screen.getAllByLabelText('规则名称')[1], { target: { value: 'GitLab' } });
     fireEvent.change(screen.getByLabelText('规则 2 匹配值'), { target: { value: 'gitlab' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
@@ -79,8 +77,8 @@ describe('OptionsApp interactions', () => {
           {
             id: expect.any(String), name: '代码', color: 'auto', enabled: true,
             rules: [
-              { id: expect.any(String), name: 'GitHub', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' }] },
-              { id: expect.any(String), name: 'GitLab', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' }] },
+              { id: expect.any(String), name: 'github', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' }] },
+              { id: expect.any(String), name: 'gitlab', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' }] },
             ],
           },
         ],

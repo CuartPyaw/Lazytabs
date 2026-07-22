@@ -120,7 +120,6 @@ export function validateGroup(candidate: GroupInput, groups: Group[]) {
   if (conditionError) return conditionError;
   if (!candidate.name.trim()) return '请输入分组名称。';
   if (!candidate.rules.length) return '请至少添加一条匹配规则。';
-  if (candidate.rules.some((rule) => !rule.name.trim())) return '请输入规则名称。';
   if (groups.some((group) => group.id !== candidate.id && group.name.trim() === candidate.name.trim())) return '分组名称已存在。';
 
   const conflict = findGroupConflict(candidate, groups);
