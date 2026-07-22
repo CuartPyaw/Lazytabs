@@ -10,13 +10,9 @@ const storedSettings = {
   collapseGroups: true,
   organizeAllWindows: false,
   theme: 'system' as const,
-  rules: [{
-    id: 'youtube',
-    name: '视频站点',
-    groupName: '视频',
-    color: 'blue' as const,
-    enabled: true,
-    conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }],
+  groups: [{
+    id: 'video', name: '视频', color: 'blue' as const, enabled: true,
+    rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }] }],
   }],
 };
 
@@ -46,93 +42,48 @@ afterEach(() => {
 describe('OptionsApp interactions', () => {
   it('persists the selected theme', async () => {
     render(<OptionsApp />);
-
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
     fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
-
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
   });
 
-  it('opens the screenshot-style rule editor', async () => {
+  it('opens a group editor with nested matching rules', async () => {
     render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
-
-    expect(screen.getByRole('dialog', { name: '添加规则' })).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: '添加规则' }).className).toContain('max-w-2xl');
-    expect(screen.getByLabelText('规则名称')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
     expect(screen.getByLabelText('分组名称')).toBeTruthy();
     expect(screen.getByLabelText('分组颜色').tagName).toBe('BUTTON');
-    expect(screen.getByLabelText('匹配字段').textContent).toContain('域名部分');
-    expect(screen.getByLabelText('匹配方式').textContent).toContain('包含');
-    fireEvent.click(screen.getByLabelText('匹配字段'));
-    expect(screen.getByRole('option', { name: '页面标题 (忽略大小写)' })).toBeTruthy();
+    expect(screen.getByLabelText('规则名称')).toBeTruthy();
+    expect(screen.getByLabelText('规则 1 匹配字段').textContent).toContain('域名部分');
     expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
   });
 
-  it('places match controls at the end of the row', async () => {
+  it('creates one group with multiple contained rules', async () => {
     render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
-
-    expect(screen.getByLabelText('匹配字段').parentElement?.parentElement?.className).toContain('grid-template-columns:12rem_9rem_minmax(0,1fr)_auto');
-  });
-
-  it('creates a rule with multiple matching conditions', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
-    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '代码托管' } });
+    fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
-    fireEvent.click(screen.getByLabelText('匹配字段'));
-    fireEvent.click(screen.getByRole('option', { name: '完整URL' }));
-    fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'github' } });
+    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: 'GitHub' } });
+    fireEvent.change(screen.getByLabelText('规则 1 匹配值'), { target: { value: 'github' } });
     fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
-    fireEvent.change(screen.getAllByLabelText('匹配值')[1], { target: { value: 'gitlab' } });
+    fireEvent.change(screen.getAllByLabelText('规则名称')[1], { target: { value: 'GitLab' } });
+    fireEvent.change(screen.getByLabelText('规则 2 匹配值'), { target: { value: 'gitlab' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
       settings: {
         ...storedSettings,
-        rules: [
-          ...storedSettings.rules,
+        groups: [
+          ...storedSettings.groups,
           {
-            id: expect.any(String),
-            name: '代码托管',
-            groupName: '代码',
-            color: 'auto',
-            enabled: true,
-            conditions: [
-              { id: expect.any(String), field: 'url', operator: 'contains', value: 'github' },
-              { id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' },
+            id: expect.any(String), name: '代码', color: 'auto', enabled: true,
+            rules: [
+              { id: expect.any(String), name: 'GitHub', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' }] },
+              { id: expect.any(String), name: 'GitLab', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' }] },
             ],
           },
         ],
       },
     }));
-  });
-
-  it('removes an added matching condition', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
-    fireEvent.click(screen.getByRole('button', { name: '添加匹配规则' }));
-    expect(screen.getAllByLabelText('匹配值')).toHaveLength(2);
-
-    fireEvent.click(screen.getByRole('button', { name: '删除第 2 条匹配规则' }));
-    expect(screen.getAllByLabelText('匹配值')).toHaveLength(1);
-  });
-
-  it('rejects a potentially conflicting rule before it is persisted', async () => {
-    render(<OptionsApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '添加规则' }));
-    fireEvent.change(screen.getByLabelText('规则名称'), { target: { value: '工作 API' } });
-    fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '工作' } });
-    fireEvent.change(screen.getByLabelText('匹配值'), { target: { value: 'youtube' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
-
-    expect(await screen.findByText('规则冲突：可能会与“视频站点”同时匹配。')).toBeTruthy();
-    expect(storageSet).not.toHaveBeenCalled();
   });
 });

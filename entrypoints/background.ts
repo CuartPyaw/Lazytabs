@@ -29,7 +29,7 @@ export default defineBackground(() => {
 
     if (message?.type === 'popup-state') {
       void Promise.all([getSettings(), chrome.tabs.query({ currentWindow: true })]).then(([settings, tabs]) =>
-        sendResponse({ enabled: settings.enabled, ruleCount: settings.rules.filter((rule) => rule.enabled).length, tabCount: tabs.length }),
+        sendResponse({ enabled: settings.enabled, groupCount: settings.groups.filter((group) => group.enabled).length, tabCount: tabs.length }),
       );
       return true;
     }

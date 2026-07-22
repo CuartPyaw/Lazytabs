@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { conditionsOverlap, findRuleConflict, matchesCondition, matchingRule, validateCondition, validateRule, type RuleField } from '../src/lib/rules';
+import { conditionsOverlap, findGroupConflict, matchesCondition, matchingGroup, validateCondition, validateGroup, type Group, type RuleField } from '../src/lib/rules';
 
 const condition = (operator: 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'regex', value: string, field: RuleField = 'hostname') => ({ id: `${field}-${operator}-${value}`, field, operator, value });
 
@@ -18,40 +18,28 @@ describe('domain rules', () => {
     expect(matchesCondition(target, condition('contains', 'codex', 'titleIgnoreCase'))).toBe(true);
   });
 
-  it('matches a rule when any condition matches', () => {
-    const rule = {
-      id: 'code',
-      name: '代码托管',
-      groupName: '代码',
-      color: 'auto' as const,
-      enabled: true,
-      conditions: [condition('contains', 'github'), condition('contains', 'gitlab')],
+  it('matches a group when any contained rule matches', () => {
+    const group: Group = {
+      id: 'code', name: '代码', color: 'auto', enabled: true,
+      rules: [{ id: 'hosting', name: '代码托管', conditions: [condition('contains', 'github'), condition('contains', 'gitlab')] }],
     };
 
-    expect(matchingRule({ hostname: 'gitlab.com' }, [rule])?.name).toBe('代码托管');
-    expect(matchingRule({ hostname: 'example.com' }, [rule])).toBeUndefined();
+    expect(matchingGroup({ hostname: 'gitlab.com' }, [group])?.name).toBe('代码');
+    expect(matchingGroup({ hostname: 'example.com' }, [group])).toBeUndefined();
   });
 
-  it('rejects blank and invalid regular-expression conditions', () => {
+  it('rejects blank conditions, duplicate names, and conflicting groups', () => {
+    const existing: Group[] = [{
+      id: 'code', name: '代码', color: 'blue', enabled: true,
+      rules: [{ id: 'hosting', name: '代码托管', conditions: [condition('contains', 'github')] }],
+    }];
+    const candidate = { id: 'work', name: '工作', color: 'green' as const, enabled: true, rules: [{ id: 'api', name: '工作 API', conditions: [condition('contains', 'github')] }] };
+
     expect(validateCondition(condition('contains', ''))).toBe('请输入匹配值。');
     expect(validateCondition(condition('regex', '['))).toBe('请输入有效的正则表达式。');
-    expect(validateRule({ name: '', groupName: '代码', color: 'auto', enabled: true, conditions: [condition('equals', 'github.com')] }, [])).toBe('请输入规则名称。');
-    expect(validateRule({ name: '代码托管', groupName: '', color: 'auto', enabled: true, conditions: [condition('equals', 'github.com')] }, [])).toBe('请输入分组名称。');
-  });
-
-  it('rejects enabled rules that may target different groups for the same host', () => {
-    const existing = [{
-      id: 'code',
-      name: '代码托管',
-      groupName: '代码',
-      color: 'blue' as const,
-      enabled: true,
-      conditions: [condition('contains', 'github')],
-    }];
-    const candidate = { id: 'work', name: 'GitHub 工作', groupName: '工作', color: 'green' as const, enabled: true, conditions: [condition('contains', 'github')] };
-
-    expect(conditionsOverlap(existing[0].conditions[0], candidate.conditions[0])).toBe(true);
-    expect(findRuleConflict(candidate, existing)).toBe('代码托管');
-    expect(validateRule(candidate, existing)).toBe('规则冲突：可能会与“代码托管”同时匹配。');
+    expect(conditionsOverlap(existing[0].rules[0].conditions[0], candidate.rules[0].conditions[0])).toBe(true);
+    expect(findGroupConflict(candidate, existing)).toBe('代码');
+    expect(validateGroup(candidate, existing)).toBe('规则冲突：可能会与“代码”同时匹配。');
+    expect(validateGroup({ ...candidate, name: '代码', enabled: false }, existing)).toBe('分组名称已存在。');
   });
 });

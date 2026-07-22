@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { getSettings, saveSettings } from '../../src/lib/settings';
 
-type PopupState = { enabled: boolean; ruleCount: number; tabCount: number };
+type PopupState = { enabled: boolean; groupCount: number; tabCount: number };
 
 export function PopupApp() {
   const [state, setState] = useState<PopupState>();
@@ -84,7 +84,7 @@ export function PopupApp() {
             </Switch>
           )}
         </div>
-        {isLoading ? <Skeleton className="mt-4 h-4 w-36 rounded" /> : <p className="m-0 mt-4 flex items-center gap-1.5 text-sm text-muted"><SlidersHorizontal size={15} strokeWidth={1.8} /> {state.ruleCount} 条已启用规则</p>}
+        {isLoading ? <Skeleton className="mt-4 h-4 w-36 rounded" /> : <p className="m-0 mt-4 flex items-center gap-1.5 text-sm text-muted"><SlidersHorizontal size={15} strokeWidth={1.8} /> {state.groupCount} 个已启用分组</p>}
       </section>
 
       <section className="px-5 pb-5 pt-4">

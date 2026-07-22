@@ -1,10 +1,10 @@
-import type { GroupColor, MatchCondition, Rule } from './rules';
+import type { Group, GroupColor, MatchCondition, Rule } from './rules';
 
 export type Settings = {
   enabled: boolean;
   collapseGroups: boolean;
   organizeAllWindows: boolean;
-  rules: Rule[];
+  groups: Group[];
   theme: Theme;
 };
 
@@ -21,6 +21,12 @@ type LegacyRule = LegacyPattern & {
   enabled: boolean;
 };
 
+type CurrentRule = Rule & {
+  groupName: string;
+  color: GroupColor | 'auto';
+  enabled: boolean;
+};
+
 type LegacyGroup = {
   id: string;
   name: string;
@@ -30,7 +36,7 @@ type LegacyGroup = {
 };
 
 const settingsKey = 'settings';
-const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, rules: [], theme: 'system' };
+const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' };
 
 function conditionForPattern(pattern: string, id: string): MatchCondition {
   const value = pattern.trim().toLowerCase().replace(/\.$/, '');
@@ -40,35 +46,56 @@ function conditionForPattern(pattern: string, id: string): MatchCondition {
   return { id, field: 'hostname', operator: 'regex', value: `^[^.]+\\.${domain}$` };
 }
 
-function migrateLegacyRules(rules: LegacyRule[]) {
-  return rules.map((rule) => ({
+function migrateLegacyGroups(groups: LegacyGroup[]): Group[] {
+  return groups.map((group) => ({
+    ...group,
+    rules: group.rules.map((rule) => ({ id: rule.id, name: rule.pattern, conditions: [conditionForPattern(rule.pattern, rule.id)] })),
+  }));
+}
+
+function migrateLegacyRules(rules: LegacyRule[]): Group[] {
+  return migrateCurrentRules(rules.map((rule) => ({
     id: rule.id,
     name: rule.pattern,
     groupName: rule.groupName,
     color: rule.color,
     enabled: rule.enabled,
     conditions: [conditionForPattern(rule.pattern, rule.id)],
-  }));
+  })));
 }
 
-function migrateGroups(groups: LegacyGroup[]) {
-  return groups.flatMap((group) => migrateLegacyRules(group.rules.map((rule) => ({ ...rule, groupName: group.name, color: group.color, enabled: group.enabled }))));
+function migrateCurrentRules(rules: CurrentRule[]): Group[] {
+  return rules.reduce<Group[]>((groups, rule) => {
+    const group = groups.find((item) => item.name === rule.groupName);
+    const nextRule = { id: rule.id, name: rule.name, conditions: rule.conditions };
+    if (group) {
+      group.rules.push(nextRule);
+      group.enabled ||= rule.enabled;
+      return groups;
+    }
+    groups.push({ id: rule.id, name: rule.groupName, color: rule.color, enabled: rule.enabled, rules: [nextRule] });
+    return groups;
+  }, []);
 }
 
-function isCurrentRule(value: unknown): value is Rule {
-  return typeof value === 'object' && value !== null && 'conditions' in value;
+function isCurrentGroup(value: unknown): value is Group {
+  return typeof value === 'object' && value !== null && 'rules' in value && Array.isArray(value.rules) && value.rules.every((rule) => typeof rule === 'object' && rule !== null && 'conditions' in rule && !('groupName' in rule));
+}
+
+function isCurrentRule(value: unknown): value is CurrentRule {
+  return typeof value === 'object' && value !== null && 'conditions' in value && 'groupName' in value;
 }
 
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(settingsKey);
-  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[]; rules?: LegacyRule[] | Rule[] } | undefined;
-  const { rules, groups, ...settings } = value ?? {};
-  const currentRules = Array.isArray(rules) && rules.every(isCurrentRule) ? rules : undefined;
+  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[] | Group[]; rules?: LegacyRule[] | CurrentRule[] } | undefined;
+  const { groups, rules, ...settings } = value ?? {};
+  const currentGroups = Array.isArray(groups) && groups.every(isCurrentGroup) ? groups : undefined;
 
   return {
     ...defaultSettings,
     ...settings,
-    rules: currentRules ?? (Array.isArray(groups) ? migrateGroups(groups) : migrateLegacyRules(Array.isArray(rules) ? rules as LegacyRule[] : [])),
+    groups: currentGroups ?? (Array.isArray(groups) ? migrateLegacyGroups(groups as LegacyGroup[]) : Array.isArray(rules) ? rules.every(isCurrentRule) ? migrateCurrentRules(rules) : migrateLegacyRules(rules as LegacyRule[]) : []),
   };
 }
 

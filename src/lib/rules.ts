@@ -24,13 +24,18 @@ export type MatchTarget = {
 export type Rule = {
   id: string;
   name: string;
-  groupName: string;
-  color: RuleColor;
-  enabled: boolean;
   conditions: MatchCondition[];
 };
 
-export type RuleInput = Omit<Rule, 'id'> & {
+export type Group = {
+  id: string;
+  name: string;
+  color: RuleColor;
+  enabled: boolean;
+  rules: Rule[];
+};
+
+export type GroupInput = Omit<Group, 'id'> & {
   id?: string;
 };
 
@@ -100,27 +105,28 @@ export function validateCondition(condition: MatchCondition) {
   }
 }
 
-export function findRuleConflict(candidate: RuleInput, rules: Rule[]) {
+export function findGroupConflict(candidate: GroupInput, groups: Group[]) {
   if (!candidate.enabled) return undefined;
 
-  return rules.find((rule) =>
-    rule.enabled
-    && rule.id !== candidate.id
-    && rule.groupName.trim() !== candidate.groupName.trim()
-    && candidate.conditions.some((condition) => rule.conditions.some((existing) => conditionsOverlap(condition, existing))),
+  return groups.find((group) =>
+    group.enabled
+    && group.id !== candidate.id
+    && candidate.rules.some((rule) => rule.conditions.some((condition) => group.rules.some((existing) => existing.conditions.some((other) => conditionsOverlap(condition, other))))),
   )?.name;
 }
 
-export function validateRule(candidate: RuleInput, rules: Rule[]) {
-  const conditionError = candidate.conditions.map(validateCondition).find(Boolean);
+export function validateGroup(candidate: GroupInput, groups: Group[]) {
+  const conditionError = candidate.rules.flatMap((rule) => rule.conditions.map(validateCondition)).find(Boolean);
   if (conditionError) return conditionError;
-  if (!candidate.name.trim()) return '请输入规则名称。';
-  if (!candidate.groupName.trim()) return '请输入分组名称。';
+  if (!candidate.name.trim()) return '请输入分组名称。';
+  if (!candidate.rules.length) return '请至少添加一条匹配规则。';
+  if (candidate.rules.some((rule) => !rule.name.trim())) return '请输入规则名称。';
+  if (groups.some((group) => group.id !== candidate.id && group.name.trim() === candidate.name.trim())) return '分组名称已存在。';
 
-  const conflict = findRuleConflict(candidate, rules);
+  const conflict = findGroupConflict(candidate, groups);
   return conflict ? `规则冲突：可能会与“${conflict}”同时匹配。` : undefined;
 }
 
-export function matchingRule(target: MatchTarget, rules: Rule[]) {
-  return rules.find((rule) => rule.enabled && rule.conditions.some((condition) => matchesCondition(target, condition)));
+export function matchingGroup(target: MatchTarget, groups: Group[]) {
+  return groups.find((group) => group.enabled && group.rules.some((rule) => rule.conditions.some((condition) => matchesCondition(target, condition))));
 }

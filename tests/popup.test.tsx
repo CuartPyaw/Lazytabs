@@ -10,7 +10,7 @@ const storedSettings = {
   collapseGroups: true,
   organizeAllWindows: false,
   theme: 'system' as const,
-  rules: [{ id: 'youtube', name: '视频站点', groupName: '视频', color: 'blue' as const, enabled: true, conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }] }],
+  groups: [{ id: 'video', name: '视频', color: 'blue' as const, enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }] }] }],
 };
 const storageGet = vi.fn();
 const storageSet = vi.fn();
@@ -23,7 +23,7 @@ beforeEach(() => {
   storageGet.mockResolvedValue({ settings: storedSettings });
   storageSet.mockResolvedValue(undefined);
   sendMessage.mockImplementation(async (message: { type: string }) => {
-    if (message.type === 'popup-state') return { enabled: true, ruleCount: 1, tabCount: 3 };
+    if (message.type === 'popup-state') return { enabled: true, groupCount: 1, tabCount: 3 };
     if (message.type === 'organize-current-window') return { grouped: 1 };
   });
   vi.stubGlobal('chrome', {
@@ -58,7 +58,7 @@ describe('PopupApp', () => {
 
   it('keeps manual organization available when automatic grouping is disabled', async () => {
     sendMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'popup-state') return { enabled: false, ruleCount: 1, tabCount: 3 };
+      if (message.type === 'popup-state') return { enabled: false, groupCount: 1, tabCount: 3 };
       if (message.type === 'organize-current-window') return { grouped: 1 };
     });
     render(<PopupApp />);
@@ -72,7 +72,7 @@ describe('PopupApp', () => {
 
   it('shows a paused icon when automatic grouping is disabled', async () => {
     sendMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'popup-state') return { enabled: false, ruleCount: 1, tabCount: 3 };
+      if (message.type === 'popup-state') return { enabled: false, groupCount: 1, tabCount: 3 };
     });
     render(<PopupApp />);
 
