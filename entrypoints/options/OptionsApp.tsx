@@ -60,10 +60,6 @@ function cloneGroup(group: Group): GroupInput {
   return { ...group, rules: group.rules.map((rule) => ({ ...rule, conditions: rule.conditions.map((condition) => ({ ...condition })) })) };
 }
 
-function describeGroup(group: Group) {
-  return group.rules.map((rule) => rule.name).join('、');
-}
-
 export function OptionsApp() {
   const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
@@ -260,7 +256,7 @@ export function OptionsApp() {
                 {loaded && settings.groups.length > 0 && <div className="divide-y divide-default border-y border-default">
                   {settings.groups.map((group) => <div className="flex min-h-20 flex-wrap items-center gap-4 py-3" key={group.id}>
                     <Switch aria-label={`启用 ${group.name}`} className="soft-switch" isSelected={group.enabled} onChange={() => void toggleGroup(group)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
-                    <div className="min-w-48 flex-1"><p className="m-0 text-sm font-medium">{group.name}</p><p className="m-0 mt-1 text-sm text-muted">{describeGroup(group)}</p></div>
+                    <div className="min-w-48 flex-1"><p className="m-0 text-sm font-medium">{group.name}</p></div>
                     <Chip size="sm" variant="soft">{colorOptions.find((option) => option.value === group.color)?.label}</Chip>
                     <div className="ml-auto flex gap-1"><Button isIconOnly aria-label={`编辑 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginEdit(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void removeGroup(group.id)}><Trash2 size={16} strokeWidth={1.8} /></Button></div>
                   </div>)}

@@ -49,6 +49,7 @@ describe('OptionsApp interactions', () => {
 
   it('opens a group editor with nested matching rules', async () => {
     render(<OptionsApp />);
+    expect(await screen.findAllByText('视频', { exact: true })).toHaveLength(1);
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
 
     expect(screen.getByRole('dialog', { name: '添加分组' })).toBeTruthy();
