@@ -59,7 +59,11 @@ async function groupTabWithGroups(tabId: number, groups: Group[]): Promise<Group
 }
 
 async function collapseOtherGroups(windowId: number, destinationGroupIds?: Set<number>) {
-  const excludedGroupIds = destinationGroupIds ?? new Set((await chrome.tabs.query({ active: true, windowId })).map((tab) => tab.groupId));
+  const excludedGroupIds = new Set(destinationGroupIds ?? []);
+  const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+  if (activeTab?.groupId && activeTab.groupId !== -1) {
+    excludedGroupIds.add(activeTab.groupId);
+  }
   const groups = await chrome.tabGroups.query({ windowId });
   await Promise.allSettled(groups
     .filter((group) => !excludedGroupIds.has(group.id) && !group.collapsed)
