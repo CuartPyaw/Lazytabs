@@ -71,6 +71,7 @@ describe('DashboardApp', () => {
 
     expect(await screen.findByText('工作')).toBeTruthy();
     expect(screen.getByText('1 个标签')).toBeTruthy();
+    expect(screen.queryByText('1 个标签 · normal')).toBeNull();
     expect(screen.getByText('工作').previousElementSibling?.className).toContain('bg-blue-400');
   });
 
