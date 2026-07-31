@@ -179,7 +179,10 @@ export function DashboardApp() {
                 {!tab.restorable && <span className="hidden text-xs text-muted sm:inline">{tab.pinned ? '固定标签，无法收纳' : '特殊标签，无法收纳'}</span>}
                 <Button isIconOnly aria-label={`关闭 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'close-tabs', tabIds: [tab.id] })}><X size={17} strokeWidth={1.9} /></Button>
               </div>;
-              const groupedTabs = (window.groups ?? []).map((group) => ({ group, tabs: visibleTabs.filter((tab) => tab.groupId === group.id) })).filter(({ tabs }) => tabs.length > 0);
+              const groupedTabs = (window.groups ?? []).map((group) => {
+                const groupTabs = window.tabs.filter((tab) => tab.groupId === group.id);
+                return { group, tabs: visibleTabs.filter((tab) => tab.groupId === group.id), restorableTabIds: groupTabs.filter((tab) => tab.restorable).map((tab) => tab.id) };
+              }).filter(({ tabs }) => tabs.length > 0);
               const ungroupedTabs = visibleTabs.filter((tab) => tab.groupId < 0 || !(window.groups ?? []).some((group) => group.id === tab.groupId));
               return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
                 <Card.Header className="flex flex-wrap items-center justify-between gap-3">
@@ -192,11 +195,12 @@ export function DashboardApp() {
                 <Card.Content className="pt-0">
                   {!visibleTabs.length && <p className="m-0 py-4 text-sm text-muted">没有匹配的标签。</p>}
                   <div className="space-y-3">
-                    {groupedTabs.map(({ group, tabs }) => <div className="overflow-hidden rounded-lg border border-default" key={group.id}>
+                    {groupedTabs.map(({ group, tabs, restorableTabIds }) => <div className="overflow-hidden rounded-lg border border-default" key={group.id}>
                       <div className="flex items-center gap-2 border-b border-default px-3 py-2.5">
                         <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${groupColorClasses[group.color] ?? 'bg-default-500'}`} />
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{group.title || '未命名分组'}</span>
                         <span className="text-xs text-muted">{tabs.length} 个标签</span>
+                        <Button isDisabled={!restorableTabIds.length} isIconOnly aria-label={`收纳分组 ${group.title || '未命名分组'}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: restorableTabIds }, () => setSelectedTabs((current) => ({ ...current, [window.id]: (current[window.id] ?? []).filter((tabId) => !restorableTabIds.includes(tabId)) })))}><FolderArchive size={16} strokeWidth={1.8} /></Button>
                       </div>
                       <div className="px-3">{tabs.map(renderTab)}</div>
                     </div>)}

@@ -104,6 +104,14 @@ describe('DashboardApp', () => {
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
   });
 
+  it('saves all restorable tabs in a browser group', async () => {
+    render(<DashboardApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '收纳分组 工作' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, tabIds: [10] }));
+  });
+
   it('confirms before closing selected tabs', async () => {
     render(<DashboardApp />);
 
