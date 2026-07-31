@@ -98,7 +98,7 @@ describe('DashboardApp', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '选择 GitLab' }));
-    fireEvent.click(screen.getByRole('button', { name: '收纳选中 (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: '收纳选中 (1)' }));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 2, tabIds: [20] }));
   });
 

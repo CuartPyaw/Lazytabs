@@ -54,6 +54,12 @@ export function PopupApp() {
     }
   }
 
+  async function openDashboard() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.windowId === undefined) return;
+    await chrome.runtime.sendMessage({ type: 'open-dashboard', windowId: tab.windowId });
+  }
+
   return (
     <main className="min-h-[284px] w-full bg-surface text-foreground">
       <header className="flex items-center justify-between px-5 pb-4 pt-5">
@@ -91,7 +97,7 @@ export function PopupApp() {
         <Button fullWidth isDisabled={isLoading || isOrganizing} size="lg" onPress={organize}>
           <FolderInput size={18} strokeWidth={1.9} /> {isOrganizing ? '正在整理...' : '整理标签页'}
         </Button>
-        <Button fullWidth className="mt-2" size="lg" variant="secondary" onPress={() => void chrome.runtime.sendMessage({ type: 'open-dashboard' })}>
+        <Button fullWidth className="mt-2" size="lg" variant="secondary" onPress={() => void openDashboard()}>
           <LayoutDashboard size={18} strokeWidth={1.9} />打开标签管理
         </Button>
         <div className="mt-4 flex items-center gap-2 text-sm text-muted">

@@ -213,13 +213,13 @@ describe('background commands', () => {
   });
 
   it('reuses a dashboard only in the focused normal window', async () => {
-    windowsGetCurrent.mockResolvedValue({ id: 2, type: 'normal', focused: true });
+    windowsGetCurrent.mockResolvedValue({ id: 1, type: 'normal', focused: true });
     tabsQuery.mockResolvedValue([
       { id: 20, windowId: 2, url: dashboardUrl, title: 'LazyTabs' },
     ] as chrome.tabs.Tab[]);
     tabsUpdate.mockResolvedValue({ id: 20, windowId: 2, url: dashboardUrl, title: 'LazyTabs' } as chrome.tabs.Tab);
 
-    const result = await sendMessage({ type: 'open-dashboard' });
+    const result = await sendMessage({ type: 'open-dashboard', windowId: 2 });
 
     expect(tabsQuery).toHaveBeenCalledWith({ windowId: 2 });
     expect(windowsUpdate).toHaveBeenCalledWith(2, { focused: true });

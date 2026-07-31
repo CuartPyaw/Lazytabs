@@ -325,9 +325,9 @@ async function openTab(message: BackgroundMessage) {
   return { tab: serializeTab(tab, windowId) };
 }
 
-async function openDashboard() {
+async function openDashboard(targetWindowId?: number) {
   const url = chrome.runtime.getURL('dashboard.html');
-  const windowId = await currentWindowId();
+  const windowId = targetWindowId ?? await currentWindowId();
   const existing = (await chrome.tabs.query({ windowId })).find((tab) => tab.id !== undefined && tab.url === url);
   if (existing?.id !== undefined && existing.windowId !== undefined) {
     await chrome.windows.update(existing.windowId, { focused: true });
@@ -404,6 +404,6 @@ export default defineBackground(() => {
     if (message?.type === 'close-tabs') return respondAsync(() => closeTabs(uniqueNumbers(message.tabIds)), sendResponse);
     if (message?.type === 'focus-tab' && typeof message.tabId === 'number') return respondAsync(() => focusTab(message.tabId as number), sendResponse);
     if (message?.type === 'open-tab') return respondAsync(() => openTab(message), sendResponse);
-    if (message?.type === 'open-dashboard') return respondAsync(openDashboard, sendResponse);
+    if (message?.type === 'open-dashboard') return respondAsync(() => openDashboard(typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
   });
 });
