@@ -1,6 +1,8 @@
-import { Button, Card, Input, Modal, Skeleton } from '@heroui/react';
+import { Button, Card, Input, Modal, Skeleton, useTheme } from '@heroui/react';
 import { Archive, Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { getSettings, type Settings } from '../../src/lib/settings';
 
 type BrowserTab = {
   id: number;
@@ -64,6 +66,20 @@ export function DashboardApp() {
   const [editingGroupId, setEditingGroupId] = useState<string>();
   const [groupName, setGroupName] = useState('');
   const [error, setError] = useState<string>();
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    void getSettings().then((settings) => setTheme(settings.theme));
+
+    const handleSettingsChange = (changes: { settings?: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName !== 'local' || !changes.settings) return;
+      const nextSettings = changes.settings.newValue as Settings | undefined;
+      if (nextSettings?.theme) setTheme(nextSettings.theme);
+      else void getSettings().then((settings) => setTheme(settings.theme));
+    };
+    chrome.storage.onChanged.addListener(handleSettingsChange);
+    return () => chrome.storage.onChanged.removeListener(handleSettingsChange);
+  }, [setTheme]);
 
   async function loadSnapshot() {
     try {

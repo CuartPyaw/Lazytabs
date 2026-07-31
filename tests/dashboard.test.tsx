@@ -21,11 +21,15 @@ const snapshot = {
 
 const sendMessage = vi.fn();
 const messageListeners = new Set<(message: { type?: string }) => void>();
+const storageChangedListeners = new Set<(changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void>();
+const storedSettings = { theme: 'dark', groups: [] };
 
 beforeEach(() => {
   sendMessage.mockReset();
   sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'get-snapshot' ? snapshot : {});
+  storedSettings.theme = 'dark';
   messageListeners.clear();
+  storageChangedListeners.clear();
   vi.stubGlobal('chrome', {
     runtime: {
       sendMessage,
@@ -34,15 +38,33 @@ beforeEach(() => {
         removeListener: (listener: (message: { type?: string }) => void) => messageListeners.delete(listener),
       },
     },
+    storage: {
+      local: { get: vi.fn(async () => ({ settings: storedSettings })) },
+      onChanged: {
+        addListener: (listener: (changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void) => storageChangedListeners.add(listener),
+        removeListener: (listener: (changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void) => storageChangedListeners.delete(listener),
+      },
+    },
   });
 });
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.unstubAllGlobals();
 });
 
 describe('DashboardApp', () => {
+  it('follows the configured appearance theme', async () => {
+    render(<DashboardApp />);
+
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'));
+
+    storedSettings.theme = 'light';
+    storageChangedListeners.forEach((listener) => listener({ settings: { newValue: storedSettings } }, 'local'));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
+  });
+
   it('saves selected restorable tabs while allowing fixed tabs to be selected for closing', async () => {
     render(<DashboardApp />);
 
