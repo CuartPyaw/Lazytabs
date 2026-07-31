@@ -10,9 +10,10 @@ const snapshot = {
     id: 1,
     focused: true,
     state: 'normal',
+    groups: [{ id: 7, title: '工作', color: 'blue' }],
     tabs: [
-      { id: 10, windowId: 1, active: true, pinned: false, title: 'GitHub', url: 'https://github.com', favIconUrl: '', restorable: true },
-      { id: 11, windowId: 1, active: false, pinned: true, title: '固定页', url: 'chrome://extensions', favIconUrl: '', restorable: false },
+      { id: 10, windowId: 1, groupId: 7, active: true, pinned: false, title: 'GitHub', url: 'https://github.com', favIconUrl: '', restorable: true },
+      { id: 11, windowId: 1, groupId: -1, active: false, pinned: true, title: '固定页', url: 'chrome://extensions', favIconUrl: '', restorable: false },
     ],
   }],
   savedTabGroups: [{ id: 'group-1', name: '窗口 1', createdAt: 1, tabs: [{ id: 'saved-1', title: '文档', url: 'https://example.com/docs' }] }],
@@ -55,6 +56,14 @@ afterEach(() => {
 });
 
 describe('DashboardApp', () => {
+  it('groups current tabs by browser group title and color', async () => {
+    render(<DashboardApp />);
+
+    expect(await screen.findByText('工作')).toBeTruthy();
+    expect(screen.getByText('1 个标签')).toBeTruthy();
+    expect(screen.getByText('工作').previousElementSibling?.className).toContain('bg-blue-400');
+  });
+
   it('keeps dashboard columns and cards within their grid tracks', async () => {
     render(<DashboardApp />);
 

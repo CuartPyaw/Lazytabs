@@ -7,6 +7,7 @@ import { getSettings, type Settings } from '../../src/lib/settings';
 type BrowserTab = {
   id: number;
   windowId: number;
+  groupId: number;
   active: boolean;
   pinned: boolean;
   title: string;
@@ -15,10 +16,17 @@ type BrowserTab = {
   restorable: boolean;
 };
 
+type BrowserGroup = {
+  id: number;
+  title: string;
+  color: string;
+};
+
 type BrowserWindow = {
   id: number;
   focused: boolean;
   state: string;
+  groups: BrowserGroup[];
   tabs: BrowserTab[];
 };
 
@@ -43,6 +51,18 @@ type Snapshot = {
 };
 
 type PendingClose = { windowId: number; tabIds: number[] };
+
+const groupColorClasses: Record<string, string> = {
+  grey: 'bg-gray-400',
+  blue: 'bg-blue-400',
+  red: 'bg-red-400',
+  yellow: 'bg-yellow-400',
+  green: 'bg-green-400',
+  pink: 'bg-pink-400',
+  purple: 'bg-purple-400',
+  cyan: 'bg-cyan-400',
+  orange: 'bg-orange-400',
+};
 
 function matchesSearch(search: string, title: string, url: string) {
   const query = search.trim().toLocaleLowerCase();
@@ -150,6 +170,17 @@ export function DashboardApp() {
               const selected = selectedTabs[window.id] ?? [];
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
+              const renderTab = (tab: BrowserTab) => <div className={`flex items-center gap-3 py-3 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
+                <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
+                <button className="flex min-w-0 flex-1 items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
+                  <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
+                  <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
+                </button>
+                {!tab.restorable && <span className="hidden text-xs text-muted sm:inline">{tab.pinned ? '固定标签，无法收纳' : '特殊标签，无法收纳'}</span>}
+                <Button isIconOnly aria-label={`关闭 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'close-tabs', tabIds: [tab.id] })}><X size={17} strokeWidth={1.9} /></Button>
+              </div>;
+              const groupedTabs = (window.groups ?? []).map((group) => ({ group, tabs: visibleTabs.filter((tab) => tab.groupId === group.id) })).filter(({ tabs }) => tabs.length > 0);
+              const ungroupedTabs = visibleTabs.filter((tab) => tab.groupId < 0 || !(window.groups ?? []).some((group) => group.id === tab.groupId));
               return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
                 <Card.Header className="flex flex-wrap items-center justify-between gap-3">
                   <div><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签 · {window.state}</Card.Description></div>
@@ -160,16 +191,16 @@ export function DashboardApp() {
                 </Card.Header>
                 <Card.Content className="pt-0">
                   {!visibleTabs.length && <p className="m-0 py-4 text-sm text-muted">没有匹配的标签。</p>}
-                  <div className="divide-y divide-default border-y border-default">
-                    {visibleTabs.map((tab) => <div className={`flex items-center gap-3 py-3 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
-                      <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
-                      <button className="flex min-w-0 flex-1 items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
-                        <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
-                        <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
-                      </button>
-                      {!tab.restorable && <span className="hidden text-xs text-muted sm:inline">{tab.pinned ? '固定标签，无法收纳' : '特殊标签，无法收纳'}</span>}
-                      <Button isIconOnly aria-label={`关闭 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'close-tabs', tabIds: [tab.id] })}><X size={17} strokeWidth={1.9} /></Button>
+                  <div className="space-y-3">
+                    {groupedTabs.map(({ group, tabs }) => <div className="overflow-hidden rounded-lg border border-default" key={group.id}>
+                      <div className="flex items-center gap-2 border-b border-default px-3 py-2.5">
+                        <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${groupColorClasses[group.color] ?? 'bg-default-500'}`} />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{group.title || '未命名分组'}</span>
+                        <span className="text-xs text-muted">{tabs.length} 个标签</span>
+                      </div>
+                      <div className="divide-y divide-default px-3">{tabs.map(renderTab)}</div>
                     </div>)}
+                    {ungroupedTabs.length > 0 && <div className="divide-y divide-default border-y border-default">{ungroupedTabs.map(renderTab)}</div>}
                   </div>
                 </Card.Content>
               </Card>;

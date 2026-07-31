@@ -61,10 +61,18 @@ function serializeTab(tab: chrome.tabs.Tab, windowId: number) {
 }
 
 async function readSnapshot() {
-  const [settings, windows] = await Promise.all([
+  const [settings, windows, groups] = await Promise.all([
     getSettings(),
     chrome.windows.getAll({ populate: true }),
+    chrome.tabGroups.query({}),
   ]);
+
+  const groupsByWindow = new Map<number, chrome.tabGroups.TabGroup[]>();
+  groups.forEach((group) => {
+    const windowGroups = groupsByWindow.get(group.windowId) ?? [];
+    windowGroups.push(group);
+    groupsByWindow.set(group.windowId, windowGroups);
+  });
 
   return {
     windows: windows.flatMap((window) => {
@@ -74,6 +82,7 @@ async function readSnapshot() {
         id: windowId,
         focused: window.focused === true,
         state: window.state ?? 'normal',
+        groups: groupsByWindow.get(windowId)?.map((group) => ({ id: group.id, title: group.title ?? '', color: group.color })) ?? [],
         tabs: (window.tabs ?? []).filter((tab): tab is chrome.tabs.Tab => tab !== undefined && tab.id !== undefined).map((tab) => serializeTab(tab, windowId)),
       }];
     }),
