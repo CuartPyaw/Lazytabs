@@ -55,6 +55,13 @@ afterEach(() => {
 });
 
 describe('DashboardApp', () => {
+  it('keeps the current and saved tab columns shrinkable', async () => {
+    render(<DashboardApp />);
+
+    expect(screen.getByRole('region', { name: '当前标签' }).classList.contains('min-w-0')).toBe(true);
+    expect(screen.getByRole('region', { name: '已收纳组' }).classList.contains('min-w-0')).toBe(true);
+  });
+
   it('follows the configured appearance theme', async () => {
     render(<DashboardApp />);
 
