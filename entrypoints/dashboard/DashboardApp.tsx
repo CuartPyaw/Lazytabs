@@ -74,8 +74,8 @@ function formatDate(timestamp: number) {
 }
 
 function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) {
-  if (!favIconUrl) return <span className="tab-icon grid size-7 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={15} strokeWidth={1.8} /></span>;
-  return <img alt="" className="tab-icon size-7 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
+  if (!favIconUrl) return <span className="tab-icon grid size-6 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={14} strokeWidth={1.8} /></span>;
+  return <img alt="" className="tab-icon size-6 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
 }
 
 export function DashboardApp() {
