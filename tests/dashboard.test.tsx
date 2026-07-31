@@ -20,14 +20,24 @@ const snapshot = {
   settings: { retainRestoredGroups: false },
 };
 
+const secondWindow = {
+  id: 2,
+  focused: false,
+  state: 'normal',
+  groups: [],
+  tabs: [{ id: 20, windowId: 2, groupId: -1, active: true, pinned: false, title: 'GitLab', url: 'https://gitlab.com', favIconUrl: '', restorable: true }],
+};
+
 const sendMessage = vi.fn();
 const messageListeners = new Set<(message: { type?: string }) => void>();
 const storageChangedListeners = new Set<(changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void>();
 const storedSettings = { theme: 'dark', groups: [] };
+let activeSnapshot = snapshot;
 
 beforeEach(() => {
   sendMessage.mockReset();
-  sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'get-snapshot' ? snapshot : {});
+  activeSnapshot = snapshot;
+  sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'get-snapshot' ? activeSnapshot : {});
   storedSettings.theme = 'dark';
   messageListeners.clear();
   storageChangedListeners.clear();
@@ -62,6 +72,33 @@ describe('DashboardApp', () => {
     expect(await screen.findByText('工作')).toBeTruthy();
     expect(screen.getByText('1 个标签')).toBeTruthy();
     expect(screen.getByText('工作').previousElementSibling?.className).toContain('bg-blue-400');
+  });
+
+  it('renders only the focused window and clears selection after focus changes', async () => {
+    activeSnapshot = { ...snapshot, windows: [...snapshot.windows, secondWindow] };
+    render(<DashboardApp />);
+
+    expect(await screen.findByText('GitHub')).toBeTruthy();
+    expect(screen.queryByText('GitLab')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '选择 GitHub' }));
+    expect(screen.getByRole('button', { name: '收纳选中 (1)' })).toBeTruthy();
+
+    activeSnapshot = {
+      ...activeSnapshot,
+      windows: activeSnapshot.windows.map((window) => ({ ...window, focused: window.id === 2 })),
+    };
+    messageListeners.forEach((listener) => listener({ type: 'snapshot-changed' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('GitLab')).toBeTruthy();
+      expect(screen.queryByText('GitHub')).toBeNull();
+      expect(screen.queryByRole('button', { name: '收纳选中 (1)' })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '选择 GitLab' }));
+    fireEvent.click(screen.getByRole('button', { name: '收纳选中 (1)' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 2, tabIds: [20] }));
   });
 
   it('keeps dashboard columns and cards within their grid tracks', async () => {

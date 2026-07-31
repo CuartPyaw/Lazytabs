@@ -120,6 +120,13 @@ export function DashboardApp() {
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, []);
 
+  const currentWindow = snapshot?.windows.find((window) => window.focused);
+  const currentWindows = currentWindow ? [currentWindow] : [];
+
+  useEffect(() => {
+    setSelectedTabs({});
+  }, [currentWindow?.id]);
+
   async function send(message: Record<string, unknown>, afterSuccess?: () => void) {
     try {
       const response = await chrome.runtime.sendMessage(message) as { error?: unknown };
@@ -163,10 +170,10 @@ export function DashboardApp() {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="current-tabs-heading">
-            <div className="flex items-center justify-between gap-3"><div><h1 className="m-0 text-lg font-semibold" id="current-tabs-heading">当前标签</h1><p className="m-0 mt-1 text-sm text-muted">按浏览器窗口顺序展示</p></div>{snapshot && <span className="text-sm text-muted">{snapshot.windows.reduce((count, window) => count + window.tabs.length, 0)} 个标签</span>}</div>
+            <div className="flex items-center justify-between gap-3"><div><h1 className="m-0 text-lg font-semibold" id="current-tabs-heading">当前标签</h1><p className="m-0 mt-1 text-sm text-muted">跟随当前浏览器窗口</p></div>{snapshot && <span className="text-sm text-muted">{currentWindow?.tabs.length ?? 0} 个标签</span>}</div>
             {!snapshot && <><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></>}
-            {snapshot?.windows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
-            {snapshot?.windows.map((window, index) => {
+            {snapshot && currentWindows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
+            {currentWindows.map((window, index) => {
               const selected = selectedTabs[window.id] ?? [];
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;

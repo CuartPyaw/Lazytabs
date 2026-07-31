@@ -66,6 +66,8 @@ async function readSnapshot() {
     chrome.windows.getAll({ populate: true }),
     chrome.tabGroups.query({}),
   ]);
+  const dashboardUrl = chrome.runtime.getURL('dashboard.html');
+  const focusedWindow = windows.find((window) => window.focused === true && (!window.type || window.type === 'normal'));
 
   const groupsByWindow = new Map<number, chrome.tabGroups.TabGroup[]>();
   groups.forEach((group) => {
@@ -75,7 +77,7 @@ async function readSnapshot() {
   });
 
   return {
-    windows: windows.flatMap((window) => {
+    windows: focusedWindow === undefined ? [] : [focusedWindow].flatMap((window) => {
       if (window.id === undefined || (window.type && window.type !== 'normal')) return [];
       const windowId = window.id;
       return [{
@@ -83,7 +85,7 @@ async function readSnapshot() {
         focused: window.focused === true,
         state: window.state ?? 'normal',
         groups: groupsByWindow.get(windowId)?.map((group) => ({ id: group.id, title: group.title ?? '', color: group.color })) ?? [],
-        tabs: (window.tabs ?? []).filter((tab): tab is chrome.tabs.Tab => tab !== undefined && tab.id !== undefined).map((tab) => serializeTab(tab, windowId)),
+        tabs: (window.tabs ?? []).filter((tab): tab is chrome.tabs.Tab => tab !== undefined && tab.id !== undefined && tab.url !== dashboardUrl).map((tab) => serializeTab(tab, windowId)),
       }];
     }),
     savedTabGroups: settings.savedTabGroups ?? [],
@@ -325,7 +327,8 @@ async function openTab(message: BackgroundMessage) {
 
 async function openDashboard() {
   const url = chrome.runtime.getURL('dashboard.html');
-  const existing = (await chrome.tabs.query({})).find((tab) => tab.id !== undefined && tab.url === url);
+  const windowId = await currentWindowId();
+  const existing = (await chrome.tabs.query({ windowId })).find((tab) => tab.id !== undefined && tab.url === url);
   if (existing?.id !== undefined && existing.windowId !== undefined) {
     await chrome.windows.update(existing.windowId, { focused: true });
     const tab = await chrome.tabs.update(existing.id, { active: true });
@@ -333,7 +336,7 @@ async function openDashboard() {
     return { tab: serializeTab(tab, existing.windowId), created: false };
   }
 
-  const tab = await chrome.tabs.create({ url });
+  const tab = await chrome.tabs.create({ windowId, url });
   if (tab.id === undefined) throw new Error('管理页面创建成功但未返回标签 ID。');
   return { tab: serializeTab(tab, tab.windowId ?? -1), created: true };
 }
@@ -384,7 +387,7 @@ export default defineBackground(() => {
 
     if (message?.type === 'popup-state') {
       return respondAsync(
-        () => Promise.all([getSettings(), chrome.tabs.query({ currentWindow: true })]).then(([settings, tabs]) => ({ enabled: settings.enabled, groupCount: settings.groups.filter((group) => group.enabled).length, tabCount: tabs.length })),
+        () => Promise.all([getSettings(), chrome.tabs.query({ currentWindow: true })]).then(([settings, tabs]) => ({ enabled: settings.enabled, groupCount: settings.groups.filter((group) => group.enabled).length, tabCount: tabs.filter((tab) => tab.url !== chrome.runtime.getURL('dashboard.html')).length })),
         sendResponse,
       );
     }
