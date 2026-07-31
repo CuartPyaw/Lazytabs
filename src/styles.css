@@ -3,7 +3,43 @@
 
 :root { color-scheme: light dark; }
 :root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"] { color-scheme: dark; --snow: rgb(250, 250, 250); }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --snow: rgb(250, 250, 250);
+  --background: #0C0C0C;
+  --foreground: #F3F4F6;
+  --surface: #121212;
+  --surface-foreground: var(--foreground);
+  --surface-secondary: #171717;
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: #171717;
+  --surface-tertiary-foreground: var(--foreground);
+  --surface-hover: #171717;
+  --overlay: #121212;
+  --overlay-foreground: var(--foreground);
+  --muted: #9AA6B2;
+  --default: #171717;
+  --default-foreground: var(--foreground);
+  --accent: #6EA8FE;
+  --accent-foreground: #07111F;
+  --accent-soft-foreground: var(--accent);
+  --field-background: #121212;
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: var(--border);
+  --border: #27303A;
+  --separator: #1F252C;
+  --focus: var(--accent);
+  --link: var(--accent);
+  --background-secondary: var(--background);
+  --background-tertiary: var(--surface-secondary);
+}
+
+:root[data-theme="dark"] .border-default { border-color: var(--border); }
+:root[data-theme="dark"] .divide-default > :not(:last-child) { border-color: var(--separator); }
+:root[data-theme="dark"] [class~="bg-default/35"],
+:root[data-theme="dark"] [class~="bg-default/40"] { background-color: var(--surface); }
+:root[data-theme="dark"] main[class~="bg-default/35"] { background-color: var(--background); }
 
 body {
   margin: 0;
