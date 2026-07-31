@@ -198,9 +198,9 @@ export function DashboardApp() {
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{group.title || '未命名分组'}</span>
                         <span className="text-xs text-muted">{tabs.length} 个标签</span>
                       </div>
-                      <div className="divide-y divide-default px-3">{tabs.map(renderTab)}</div>
+                      <div className="px-3">{tabs.map(renderTab)}</div>
                     </div>)}
-                    {ungroupedTabs.length > 0 && <div className="divide-y divide-default border-y border-default">{ungroupedTabs.map(renderTab)}</div>}
+                    {ungroupedTabs.length > 0 && <div className="border-y border-default">{ungroupedTabs.map(renderTab)}</div>}
                   </div>
                 </Card.Content>
               </Card>;
@@ -218,7 +218,7 @@ export function DashboardApp() {
                   <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
                   {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
                 </Card.Header>
-                <Card.Content className="pt-0"><div className="divide-y divide-default border-y border-default">
+                <Card.Content className="pt-0"><div className="border-y border-default">
                   {visibleTabs.map((tab) => <div className="tab-row flex items-center gap-3 py-3" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-1"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: group.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: group.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: group.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
                 </div></Card.Content>
               </Card>;
