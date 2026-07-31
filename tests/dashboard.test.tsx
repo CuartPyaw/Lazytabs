@@ -74,7 +74,11 @@ describe('DashboardApp', () => {
     expect(savedGroups.classList.contains('flex')).toBe(true);
     expect(savedGroups.classList.contains('min-w-0')).toBe(true);
 
-    await screen.findByRole('button', { name: '收纳窗口' });
+    const saveWindowButton = await screen.findByRole('button', { name: '收纳窗口' });
+    expect(saveWindowButton.textContent).toBe('');
+    expect(saveWindowButton.classList.contains('absolute')).toBe(true);
+    expect(saveWindowButton.classList.contains('right-4')).toBe(true);
+    expect(saveWindowButton.classList.contains('top-4')).toBe(true);
     [currentTabs, savedGroups].forEach((section) => {
       const card = section.querySelector('[data-slot="card"]');
       expect(card?.classList.contains('w-full')).toBe(true);

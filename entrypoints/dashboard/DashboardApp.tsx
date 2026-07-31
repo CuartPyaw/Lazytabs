@@ -185,12 +185,10 @@ export function DashboardApp() {
               }).filter(({ tabs }) => tabs.length > 0);
               const ungroupedTabs = visibleTabs.filter((tab) => tab.groupId < 0 || !(window.groups ?? []).some((group) => group.id === tab.groupId));
               return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
-                <Card.Header className="flex flex-wrap items-center justify-between gap-3">
-                  <div><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签 · {window.state}</Card.Description></div>
-                  <div className="flex flex-wrap gap-2">
-                    {selected.length > 0 && <><Button size="sm" variant="secondary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: selected }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><Archive size={15} strokeWidth={1.8} />收纳选中 ({selected.length})</Button><Button size="sm" variant="danger" onPress={() => setPendingClose({ windowId: window.id, tabIds: selected })}><Trash2 size={15} strokeWidth={1.8} />关闭选中</Button></>}
-                    <Button isDisabled={!restorableCount} size="sm" variant="secondary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><FolderArchive size={15} strokeWidth={1.8} />收纳窗口</Button>
-                  </div>
+                <Card.Header className="relative flex flex-col items-stretch gap-3">
+                  <div className="pr-10"><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签 · {window.state}</Card.Description></div>
+                  <Button className="absolute right-4 top-4" isDisabled={!restorableCount} isIconOnly aria-label="收纳窗口" size="sm" variant="tertiary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><FolderArchive size={17} strokeWidth={1.8} /></Button>
+                  {selected.length > 0 && <div className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: selected }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><Archive size={15} strokeWidth={1.8} />收纳选中 ({selected.length})</Button><Button size="sm" variant="danger" onPress={() => setPendingClose({ windowId: window.id, tabIds: selected })}><Trash2 size={15} strokeWidth={1.8} />关闭选中</Button></div>}
                 </Card.Header>
                 <Card.Content className="pt-0">
                   {!visibleTabs.length && <p className="m-0 py-4 text-sm text-muted">没有匹配的标签。</p>}
