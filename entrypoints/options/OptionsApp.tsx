@@ -298,6 +298,7 @@ export function OptionsApp() {
         </aside>
 
         <div className="grid gap-6">
+          <div className="settings-section" key={activeSection}>
           {activeSection === 'general' && <Card>
             <Card.Header><div><Card.Title>通用</Card.Title><Card.Description>调整标签页整理的默认行为。</Card.Description></div></Card.Header>
             <Card.Content className="grid gap-5">
@@ -398,6 +399,7 @@ export function OptionsApp() {
               </Modal.Backdrop>
             </Modal>
           </>}
+          </div>
         </div>
       </div>
     </main>

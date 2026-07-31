@@ -22,6 +22,9 @@ button { font: inherit; }
 
 @keyframes group-editor-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes group-editor-fade-out { from { opacity: 1; } to { opacity: 0; } }
+.settings-section { animation: settings-section-fade-in 160ms ease-out; }
+
+@keyframes settings-section-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 .theme-choice { display: grid; width: 100%; gap: 8px; color: var(--foreground); font-size: 0.875rem; font-weight: 500; text-align: center; }
 .theme-preview { position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent); border-radius: 8px; background: #efefef; }
@@ -91,6 +94,7 @@ button { font: inherit; }
   .group-editor-backdrop[data-exiting="true"],
   .group-editor-container[data-entering="true"],
   .group-editor-container[data-exiting="true"],
+  .settings-section,
   .soft-switch .switch__control,
   .soft-switch .switch__thumb {
     transition: none;
