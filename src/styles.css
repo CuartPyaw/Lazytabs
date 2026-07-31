@@ -53,14 +53,13 @@ button { font: inherit; }
 
 .tab-row .tab-icon {
   transform-origin: center bottom;
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 180ms ease;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
 }
 
 .tab-row:hover .tab-icon,
 .tab-row:has(:focus-visible) .tab-icon {
   transform: translateY(-2px) scale(1.16);
-  filter: drop-shadow(0 4px 4px color-mix(in srgb, var(--foreground) 18%, transparent));
 }
 
 .tab-row:has(+ .tab-row:hover) .tab-icon,
