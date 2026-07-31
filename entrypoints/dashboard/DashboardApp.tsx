@@ -172,7 +172,7 @@ export function DashboardApp() {
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
               const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-3 py-3 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
                 <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
-                <button className="flex min-w-0 flex-1 items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
+                <button className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
                 </button>
