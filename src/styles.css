@@ -3,7 +3,7 @@
 
 :root { color-scheme: light dark; }
 :root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] { color-scheme: dark; --snow: rgb(250, 250, 250); }
 
 body {
   margin: 0;
