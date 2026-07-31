@@ -142,7 +142,7 @@ export function DashboardApp() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
-          <section className="grid min-w-0 content-start gap-4" aria-labelledby="current-tabs-heading">
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="current-tabs-heading">
             <div className="flex items-center justify-between gap-3"><div><h1 className="m-0 text-lg font-semibold" id="current-tabs-heading">当前标签</h1><p className="m-0 mt-1 text-sm text-muted">按浏览器窗口顺序展示</p></div>{snapshot && <span className="text-sm text-muted">{snapshot.windows.reduce((count, window) => count + window.tabs.length, 0)} 个标签</span>}</div>
             {!snapshot && <><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></>}
             {snapshot?.windows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
@@ -150,7 +150,7 @@ export function DashboardApp() {
               const selected = selectedTabs[window.id] ?? [];
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
-              return <Card key={window.id}>
+              return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
                 <Card.Header className="flex flex-wrap items-center justify-between gap-3">
                   <div><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签 · {window.state}</Card.Description></div>
                   <div className="flex flex-wrap gap-2">
@@ -176,13 +176,13 @@ export function DashboardApp() {
             })}
           </section>
 
-          <section className="grid min-w-0 content-start gap-4" aria-labelledby="saved-groups-heading">
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="saved-groups-heading">
             <div><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">已收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${visibleGroupCount} 组可见` : '正在加载'}</p></div>
             {snapshot && savedGroups.length === 0 && <EmptyState icon={<FolderArchive size={23} strokeWidth={1.7} />} title="还没有收纳组" description="收纳标签后，可在这里恢复或管理它们。" />}
             {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
               const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const isEditing = editingGroupId === group.id;
-              return <Card key={group.id}>
+              return <Card className="w-full min-w-0 overflow-hidden" key={group.id}>
                 <Card.Header className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
                   {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}

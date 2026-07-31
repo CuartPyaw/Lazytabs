@@ -55,11 +55,23 @@ afterEach(() => {
 });
 
 describe('DashboardApp', () => {
-  it('keeps the current and saved tab columns shrinkable', async () => {
+  it('keeps dashboard columns and cards within their grid tracks', async () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('region', { name: '当前标签' }).classList.contains('min-w-0')).toBe(true);
-    expect(screen.getByRole('region', { name: '已收纳组' }).classList.contains('min-w-0')).toBe(true);
+    const currentTabs = screen.getByRole('region', { name: '当前标签' });
+    const savedGroups = screen.getByRole('region', { name: '已收纳组' });
+    expect(currentTabs.classList.contains('flex')).toBe(true);
+    expect(currentTabs.classList.contains('min-w-0')).toBe(true);
+    expect(savedGroups.classList.contains('flex')).toBe(true);
+    expect(savedGroups.classList.contains('min-w-0')).toBe(true);
+
+    await screen.findByRole('button', { name: '收纳窗口' });
+    [currentTabs, savedGroups].forEach((section) => {
+      const card = section.querySelector('[data-slot="card"]');
+      expect(card?.classList.contains('w-full')).toBe(true);
+      expect(card?.classList.contains('min-w-0')).toBe(true);
+      expect(card?.classList.contains('overflow-hidden')).toBe(true);
+    });
   });
 
   it('follows the configured appearance theme', async () => {
