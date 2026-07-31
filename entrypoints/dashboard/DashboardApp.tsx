@@ -1,0 +1,202 @@
+import { Button, Card, Input, Modal, Skeleton } from '@heroui/react';
+import { Archive, Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+type BrowserTab = {
+  id: number;
+  windowId: number;
+  active: boolean;
+  pinned: boolean;
+  title: string;
+  url: string;
+  favIconUrl: string;
+  restorable: boolean;
+};
+
+type BrowserWindow = {
+  id: number;
+  focused: boolean;
+  state: string;
+  tabs: BrowserTab[];
+};
+
+type SavedTab = {
+  id: string;
+  title: string;
+  url: string;
+  favIconUrl?: string;
+};
+
+type SavedTabGroup = {
+  id: string;
+  name: string;
+  createdAt: number;
+  tabs: SavedTab[];
+};
+
+type Snapshot = {
+  windows: BrowserWindow[];
+  savedTabGroups: SavedTabGroup[];
+  settings: { retainRestoredGroups: boolean };
+};
+
+type PendingClose = { windowId: number; tabIds: number[] };
+
+function matchesSearch(search: string, title: string, url: string) {
+  const query = search.trim().toLocaleLowerCase();
+  return !query || title.toLocaleLowerCase().includes(query) || url.toLocaleLowerCase().includes(query);
+}
+
+function formatDate(timestamp: number) {
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp);
+}
+
+function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) {
+  if (!favIconUrl) return <span className="grid size-8 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={16} strokeWidth={1.8} /></span>;
+  return <img alt="" className="size-8 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
+}
+
+export function DashboardApp() {
+  const [snapshot, setSnapshot] = useState<Snapshot>();
+  const [search, setSearch] = useState('');
+  const [selectedTabs, setSelectedTabs] = useState<Record<number, number[]>>({});
+  const [pendingClose, setPendingClose] = useState<PendingClose>();
+  const [editingGroupId, setEditingGroupId] = useState<string>();
+  const [groupName, setGroupName] = useState('');
+  const [error, setError] = useState<string>();
+
+  async function loadSnapshot() {
+    try {
+      const nextSnapshot = await chrome.runtime.sendMessage({ type: 'get-snapshot' }) as Snapshot & { error?: string };
+      if (nextSnapshot.error) throw new Error(nextSnapshot.error);
+      setSnapshot(nextSnapshot);
+    } catch (reason) {
+      setError(reason instanceof Error && reason.message ? reason.message : '加载标签数据失败。');
+    }
+  }
+
+  useEffect(() => {
+    void loadSnapshot();
+    const listener = (message: { type?: string }) => {
+      if (message.type === 'snapshot-changed') void loadSnapshot();
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, []);
+
+  async function send(message: Record<string, unknown>, afterSuccess?: () => void) {
+    try {
+      const response = await chrome.runtime.sendMessage(message) as { error?: unknown };
+      if (typeof response?.error === 'string') throw new Error(response.error);
+      setError(undefined);
+      afterSuccess?.();
+      await loadSnapshot();
+    } catch (reason) {
+      setError(reason instanceof Error && reason.message ? reason.message : '操作失败，请重试。');
+    }
+  }
+
+  function toggleTab(windowId: number, tabId: number) {
+    setSelectedTabs((current) => {
+      const selected = current[windowId] ?? [];
+      return { ...current, [windowId]: selected.includes(tabId) ? selected.filter((id) => id !== tabId) : [...selected, tabId] };
+    });
+  }
+
+  function beginRename(group: SavedTabGroup) {
+    setEditingGroupId(group.id);
+    setGroupName(group.name);
+  }
+
+  const savedGroups = [...(snapshot?.savedTabGroups ?? [])].sort((left, right) => right.createdAt - left.createdAt);
+  const visibleGroupCount = savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).length;
+
+  return (
+    <main className="flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="border-b border-default bg-background/95 px-4 py-4 backdrop-blur sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Layers3 size={19} strokeWidth={2} /></span>
+            <div><p className="m-0 font-semibold">LazyTabs</p><p className="m-0 text-xs text-muted">概览</p></div>
+          </div>
+          <div className="relative min-w-52 flex-1 sm:max-w-xl"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted" size={17} strokeWidth={1.8} /><Input aria-label="全局搜索" className="w-full pl-9" placeholder="搜索标题或 URL" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+          <Button isDisabled={!savedGroups.length} size="sm" variant="secondary" onPress={() => void send({ type: 'restore-all' })}><RotateCcw size={16} strokeWidth={1.8} />恢复全部</Button>
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+          <section className="grid content-start gap-4" aria-labelledby="current-tabs-heading">
+            <div className="flex items-center justify-between gap-3"><div><h1 className="m-0 text-lg font-semibold" id="current-tabs-heading">当前标签</h1><p className="m-0 mt-1 text-sm text-muted">按浏览器窗口顺序展示</p></div>{snapshot && <span className="text-sm text-muted">{snapshot.windows.reduce((count, window) => count + window.tabs.length, 0)} 个标签</span>}</div>
+            {!snapshot && <><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></>}
+            {snapshot?.windows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
+            {snapshot?.windows.map((window, index) => {
+              const selected = selectedTabs[window.id] ?? [];
+              const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
+              const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
+              return <Card key={window.id}>
+                <Card.Header className="flex flex-wrap items-center justify-between gap-3">
+                  <div><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签 · {window.state}</Card.Description></div>
+                  <div className="flex flex-wrap gap-2">
+                    {selected.length > 0 && <><Button size="sm" variant="secondary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: selected }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><Archive size={15} strokeWidth={1.8} />收纳选中 ({selected.length})</Button><Button size="sm" variant="danger" onPress={() => setPendingClose({ windowId: window.id, tabIds: selected })}><Trash2 size={15} strokeWidth={1.8} />关闭选中</Button></>}
+                    <Button isDisabled={!restorableCount} size="sm" variant="secondary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><FolderArchive size={15} strokeWidth={1.8} />收纳窗口</Button>
+                  </div>
+                </Card.Header>
+                <Card.Content className="pt-0">
+                  {!visibleTabs.length && <p className="m-0 py-4 text-sm text-muted">没有匹配的标签。</p>}
+                  <div className="divide-y divide-default border-y border-default">
+                    {visibleTabs.map((tab) => <div className={`flex items-center gap-3 py-3 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
+                      <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
+                      <button className="flex min-w-0 flex-1 items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
+                        <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
+                        <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
+                      </button>
+                      {!tab.restorable && <span className="hidden text-xs text-muted sm:inline">{tab.pinned ? '固定标签，无法收纳' : '特殊标签，无法收纳'}</span>}
+                      <Button isIconOnly aria-label={`关闭 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'close-tabs', tabIds: [tab.id] })}><X size={17} strokeWidth={1.9} /></Button>
+                    </div>)}
+                  </div>
+                </Card.Content>
+              </Card>;
+            })}
+          </section>
+
+          <section className="grid content-start gap-4" aria-labelledby="saved-groups-heading">
+            <div><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">已收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${visibleGroupCount} 组可见` : '正在加载'}</p></div>
+            {snapshot && savedGroups.length === 0 && <EmptyState icon={<FolderArchive size={23} strokeWidth={1.7} />} title="还没有收纳组" description="收纳标签后，可在这里恢复或管理它们。" />}
+            {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
+              const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
+              const isEditing = editingGroupId === group.id;
+              return <Card key={group.id}>
+                <Card.Header className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
+                  {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
+                </Card.Header>
+                <Card.Content className="pt-0"><div className="divide-y divide-default border-y border-default">
+                  {visibleTabs.map((tab) => <div className="flex items-center gap-3 py-3" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-1"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: group.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: group.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: group.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
+                </div></Card.Content>
+              </Card>;
+            })}
+          </section>
+        </div>
+      </div>
+
+      {error && <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger shadow-lg"><CircleAlert size={18} strokeWidth={2} /><span className="flex-1">{error}</span><Button isIconOnly aria-label="关闭错误提示" size="sm" variant="tertiary" onPress={() => setError(undefined)}><X size={16} /></Button></div>}
+
+      <Modal isOpen={Boolean(pendingClose)} onOpenChange={(isOpen) => { if (!isOpen) setPendingClose(undefined); }}>
+        <Modal.Backdrop className="group-editor-backdrop">
+          <Modal.Container className="group-editor-container" placement="center" size="sm">
+            <Modal.Dialog className="w-full rounded-lg p-0">
+              <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>关闭选中标签</Modal.Heading></Modal.Header>
+              <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">确定要关闭选中的 {pendingClose?.tabIds.length ?? 0} 个标签吗？此操作无法撤销。</Modal.Body>
+              <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setPendingClose(undefined)}>取消</Button><Button variant="danger" onPress={() => { if (!pendingClose) return; const { windowId, tabIds } = pendingClose; setPendingClose(undefined); void send({ type: 'close-tabs', tabIds }, () => setSelectedTabs((current) => ({ ...current, [windowId]: [] }))); }}><Trash2 size={16} strokeWidth={1.8} />确认关闭</Button></Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+    </main>
+  );
+}
+
+function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return <Card><Card.Content className="grid place-items-center py-12 text-center"><span className="grid size-11 place-items-center rounded-lg bg-default text-muted">{icon}</span><p className="mb-0 mt-4 font-medium">{title}</p><p className="mb-0 mt-1 text-sm text-muted">{description}</p></Card.Content></Card>;
+}

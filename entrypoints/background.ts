@@ -1,6 +1,338 @@
 import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
-import { getSettings } from '../src/lib/settings';
+import { appendSavedTabGroup, createSavedTabGroup, isRestorableTab, removeSavedTab, removeSavedTabGroup, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
+import { getSettings, saveSettings, type Settings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
+
+type BackgroundMessage = {
+  type?: string;
+  [key: string]: unknown;
+};
+
+type CloseTabsResult = {
+  closedTabIds: number[];
+  failedTabIds: number[];
+  errors: string[];
+};
+
+type RestoreResult = {
+  restoredTabIds: number[];
+  failedSavedTabIds: string[];
+  errors: string[];
+};
+
+let savedTabsQueue: Promise<void> = Promise.resolve();
+
+// ponytail: one background queue; use per-group locks only if management traffic becomes high.
+function withSavedTabsLock<T>(operation: () => Promise<T>) {
+  const result = savedTabsQueue.then(operation, operation);
+  savedTabsQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : '操作失败。';
+}
+
+function uniqueNumbers(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((item): item is number => typeof item === 'number' && Number.isInteger(item)))];
+}
+
+function notifySnapshotChanged(reason: string) {
+  const sendMessage = chrome.runtime?.sendMessage;
+  if (typeof sendMessage !== 'function') return;
+  void sendMessage({ type: 'snapshot-changed', reason }).catch(() => undefined);
+}
+
+function serializeTab(tab: chrome.tabs.Tab, windowId: number) {
+  return {
+    id: tab.id ?? -1,
+    windowId: tab.windowId ?? windowId,
+    groupId: tab.groupId ?? -1,
+    active: tab.active === true,
+    pinned: tab.pinned === true,
+    incognito: tab.incognito === true,
+    title: tab.title ?? '',
+    url: tab.url ?? '',
+    favIconUrl: tab.favIconUrl ?? '',
+    status: tab.status ?? '',
+    restorable: isRestorableTab(tab),
+  };
+}
+
+async function readSnapshot() {
+  const [settings, windows] = await Promise.all([
+    getSettings(),
+    chrome.windows.getAll({ populate: true }),
+  ]);
+
+  return {
+    windows: windows.flatMap((window) => {
+      if (window.id === undefined || (window.type && window.type !== 'normal')) return [];
+      const windowId = window.id;
+      return [{
+        id: windowId,
+        focused: window.focused === true,
+        state: window.state ?? 'normal',
+        tabs: (window.tabs ?? []).filter((tab): tab is chrome.tabs.Tab => tab !== undefined && tab.id !== undefined).map((tab) => serializeTab(tab, windowId)),
+      }];
+    }),
+    savedTabGroups: settings.savedTabGroups ?? [],
+    settings: {
+      retainRestoredGroups: settings.retainRestoredGroups === true,
+    },
+  };
+}
+
+async function getTabsForSave(tabIds: number[] | undefined, windowId: number | undefined) {
+  if (!tabIds) {
+    const tabs = await chrome.tabs.query(windowId === undefined ? { currentWindow: true } : { windowId });
+    return { tabs, failedTabIds: [] as number[] };
+  }
+
+  const results = await Promise.all(tabIds.map(async (tabId) => {
+    try {
+      return { tab: await chrome.tabs.get(tabId) };
+    } catch {
+      return { failedTabId: tabId };
+    }
+  }));
+  const tabs: chrome.tabs.Tab[] = results.flatMap((result) => 'tab' in result && result.tab ? [result.tab] : []);
+  return {
+    tabs,
+    failedTabIds: results.flatMap((result) => 'failedTabId' in result ? [result.failedTabId] : []),
+  };
+}
+
+async function closeTabs(tabIds: number[]): Promise<CloseTabsResult> {
+  const results = await Promise.all(tabIds.map(async (tabId) => {
+    try {
+      await chrome.tabs.remove(tabId);
+      return { tabId };
+    } catch (error) {
+      return { tabId, error: errorMessage(error) };
+    }
+  }));
+
+  return {
+    closedTabIds: results.flatMap((result) => 'error' in result ? [] : [result.tabId]),
+    failedTabIds: results.flatMap((result) => 'error' in result ? [result.tabId] : []),
+    errors: results.flatMap((result) => 'error' in result && result.error ? [result.error] : []),
+  };
+}
+
+async function saveTabs(tabIds: number[] | undefined, windowId: number | undefined) {
+  return withSavedTabsLock(async () => {
+    const selectedTabIds = tabIds ? uniqueNumbers(tabIds) : undefined;
+    const { tabs, failedTabIds } = await getTabsForSave(selectedTabIds, windowId);
+    const savedTabs: Array<{ sourceTabId: number; tab: SavedTab }> = [];
+    const skippedTabIds: number[] = [];
+
+    for (const tab of tabs) {
+      if (tab.id === undefined) continue;
+      const savedTab = toSavedTab(tab);
+      if (savedTab) savedTabs.push({ sourceTabId: tab.id, tab: savedTab });
+      else skippedTabIds.push(tab.id);
+    }
+
+    if (!savedTabs.length) throw new Error('没有可收纳的网页标签。');
+
+    const createdAt = Date.now();
+    const windowIds = new Set(tabs.filter((tab) => savedTabs.some((item) => item.sourceTabId === tab.id)).map((tab) => tab.windowId).filter((id): id is number => id !== undefined));
+    const windowLabel = windowIds.size === 1 ? `窗口 ${[...windowIds][0]}` : '多个窗口';
+    const group = createSavedTabGroup(savedTabs.map((item) => item.tab), windowLabel, createdAt);
+    const settings = await getSettings();
+
+    // Persist before closing tabs so a browser API failure cannot lose the records.
+    await saveSettings(appendSavedTabGroup(settings, group));
+    const closeResult = await closeTabs(savedTabs.map((item) => item.sourceTabId));
+    notifySnapshotChanged('saved-tabs');
+
+    return {
+      group,
+      skippedTabIds: [...new Set([...failedTabIds, ...skippedTabIds])],
+      ...closeResult,
+    };
+  });
+}
+
+async function currentWindowId() {
+  const window = await chrome.windows.getCurrent();
+  if (window.id === undefined || (window.type && window.type !== 'normal')) throw new Error('没有可用的普通窗口。');
+  return window.id;
+}
+
+async function createTabInCurrentWindow(savedTab: SavedTab) {
+  const windowId = await currentWindowId();
+  const tab = await chrome.tabs.create({ windowId, url: savedTab.url });
+  if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
+  return { windowId, tabId: tab.id };
+}
+
+async function restoreGroup(settings: Settings, group: SavedTabGroup, windowId: number): Promise<RestoreResult & { remainingTabs: SavedTab[] }> {
+  const restoredTabIds: number[] = [];
+  const failedSavedTabIds: string[] = [];
+  const errors: string[] = [];
+
+  for (const savedTab of group.tabs) {
+    try {
+      const tab = await chrome.tabs.create({ windowId, url: savedTab.url });
+      if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
+      restoredTabIds.push(tab.id);
+    } catch (error) {
+      failedSavedTabIds.push(savedTab.id);
+      errors.push(errorMessage(error));
+    }
+  }
+
+  return { restoredTabIds, failedSavedTabIds, errors, remainingTabs: group.tabs.filter((tab) => failedSavedTabIds.includes(tab.id)), };
+}
+
+async function restoreSavedTab(groupId: string, savedTabId: string) {
+  return withSavedTabsLock(async () => {
+    const settings = await getSettings();
+    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    const savedTab = group?.tabs.find((item) => item.id === savedTabId);
+    if (!group || !savedTab) throw new Error('找不到要恢复的收纳记录。');
+
+    const { windowId, tabId } = await createTabInCurrentWindow(savedTab);
+    const keep = settings.retainRestoredGroups === true;
+    if (!keep) {
+      await saveSettings(removeSavedTab(settings, groupId, savedTabId));
+      notifySnapshotChanged('restored-tab');
+    }
+    return { groupId, savedTabId, restoredTabId: tabId, windowId, removed: !keep };
+  });
+}
+
+async function restoreSavedGroup(groupId: string) {
+  return withSavedTabsLock(async () => {
+    const settings = await getSettings();
+    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    if (!group) throw new Error('找不到要恢复的收纳组。');
+
+    const windowId = await currentWindowId();
+    const result = await restoreGroup(settings, group, windowId);
+    const keep = settings.retainRestoredGroups === true;
+    if (!keep && result.failedSavedTabIds.length < group.tabs.length) {
+      const savedTabGroups = result.remainingTabs.length
+        ? (settings.savedTabGroups ?? []).map((item) => item.id === groupId ? { ...item, tabs: result.remainingTabs } : item)
+        : (settings.savedTabGroups ?? []).filter((item) => item.id !== groupId);
+      await saveSettings({ ...settings, savedTabGroups });
+      notifySnapshotChanged('restored-group');
+    }
+
+    const { remainingTabs: _remainingTabs, ...response } = result;
+    return { groupId, windowId, removed: !keep && result.failedSavedTabIds.length === 0, ...response };
+  });
+}
+
+async function restoreAllSavedGroups() {
+  return withSavedTabsLock(async () => {
+    const settings = await getSettings();
+    const groups = settings.savedTabGroups ?? [];
+    const windowId = await currentWindowId();
+    const keep = settings.retainRestoredGroups === true;
+    const remainingGroups: SavedTabGroup[] = [];
+    const restoredTabIds: number[] = [];
+    const failedSavedTabIds: string[] = [];
+    const errors: string[] = [];
+
+    for (const group of groups) {
+      const result = await restoreGroup(settings, group, windowId);
+      restoredTabIds.push(...result.restoredTabIds);
+      failedSavedTabIds.push(...result.failedSavedTabIds);
+      errors.push(...result.errors);
+      if (keep || result.remainingTabs.length) remainingGroups.push(keep ? group : { ...group, tabs: result.remainingTabs });
+    }
+
+    if (!keep) {
+      await saveSettings({ ...settings, savedTabGroups: remainingGroups });
+      notifySnapshotChanged('restored-all');
+    }
+
+    return { windowId, restoredTabIds, failedSavedTabIds, errors, removed: !keep && failedSavedTabIds.length === 0 };
+  });
+}
+
+async function deleteSavedGroup(groupId: string) {
+  return withSavedTabsLock(async () => {
+    const settings = await getSettings();
+    if (!(settings.savedTabGroups ?? []).some((group) => group.id === groupId)) return { groupId, deleted: false };
+    await saveSettings(removeSavedTabGroup(settings, groupId));
+    notifySnapshotChanged('deleted-group');
+    return { groupId, deleted: true };
+  });
+}
+
+async function deleteSavedTab(groupId: string, savedTabId: string) {
+  return withSavedTabsLock(async () => {
+    const settings = await getSettings();
+    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    if (!group?.tabs.some((tab) => tab.id === savedTabId)) return { groupId, savedTabId, deleted: false };
+    await saveSettings(removeSavedTab(settings, groupId, savedTabId));
+    notifySnapshotChanged('deleted-tab');
+    return { groupId, savedTabId, deleted: true };
+  });
+}
+
+async function renameSavedGroup(groupId: string, name: string) {
+  return withSavedTabsLock(async () => {
+    const nextName = name.trim();
+    if (!nextName) throw new Error('收纳组名称不能为空。');
+    const settings = await getSettings();
+    const groups = settings.savedTabGroups ?? [];
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) throw new Error('找不到要重命名的收纳组。');
+    if (groups.some((item) => item.id !== groupId && item.name === nextName)) throw new Error('收纳组名称已存在。');
+    await saveSettings({ ...settings, savedTabGroups: groups.map((item) => item.id === groupId ? { ...item, name: nextName } : item) });
+    notifySnapshotChanged('renamed-group');
+    return { groupId, name: nextName };
+  });
+}
+
+async function focusTab(tabId: number) {
+  const tab = await chrome.tabs.get(tabId);
+  if (tab.windowId === undefined) throw new Error('标签没有所属窗口。');
+  await chrome.windows.update(tab.windowId, { focused: true });
+  await chrome.tabs.update(tabId, { active: true });
+  return { tab: serializeTab({ ...tab, active: true }, tab.windowId) };
+}
+
+async function openTab(message: BackgroundMessage) {
+  let url: string | undefined;
+  if (typeof message.url === 'string') url = message.url;
+  if (typeof message.groupId === 'string' && typeof message.savedTabId === 'string') {
+    const settings = await getSettings();
+    url = settings.savedTabGroups?.find((group) => group.id === message.groupId)?.tabs.find((tab) => tab.id === message.savedTabId)?.url;
+  }
+  if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');
+
+  const windowId = typeof message.windowId === 'number' ? message.windowId : await currentWindowId();
+  const tab = await chrome.tabs.create({ windowId, url });
+  if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
+  return { tab: serializeTab(tab, windowId) };
+}
+
+async function openDashboard() {
+  const url = chrome.runtime.getURL('dashboard.html');
+  const existing = (await chrome.tabs.query({})).find((tab) => tab.id !== undefined && tab.url === url);
+  if (existing?.id !== undefined && existing.windowId !== undefined) {
+    await chrome.windows.update(existing.windowId, { focused: true });
+    const tab = await chrome.tabs.update(existing.id, { active: true });
+    if (tab === undefined) throw new Error('管理页面激活失败。');
+    return { tab: serializeTab(tab, existing.windowId), created: false };
+  }
+
+  const tab = await chrome.tabs.create({ url });
+  if (tab.id === undefined) throw new Error('管理页面创建成功但未返回标签 ID。');
+  return { tab: serializeTab(tab, tab.windowId ?? -1), created: true };
+}
+
+function respondAsync(operation: () => Promise<unknown>, sendResponse: (response: unknown) => void) {
+  void operation().then(sendResponse).catch((error) => sendResponse({ error: errorMessage(error) }));
+  return true;
+}
 
 export default defineBackground(() => {
   chrome.commands.onCommand.addListener((command) => {
@@ -9,29 +341,57 @@ export default defineBackground(() => {
 
   chrome.tabs.onCreated.addListener((tab) => {
     if (tab.id !== undefined) void groupTab(tab.id);
+    notifySnapshotChanged('tab-created');
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) void groupTab(tabId);
+    if (changeInfo.url !== undefined || changeInfo.title !== undefined || changeInfo.status !== undefined || changeInfo.pinned !== undefined || changeInfo.groupId !== undefined) notifySnapshotChanged('tab-updated');
+  });
+
+  chrome.tabs.onRemoved?.addListener(() => notifySnapshotChanged('tab-removed'));
+  chrome.tabs.onActivated?.addListener(() => notifySnapshotChanged('tab-activated'));
+  chrome.windows?.onCreated?.addListener(() => notifySnapshotChanged('window-created'));
+  chrome.windows?.onRemoved?.addListener(() => notifySnapshotChanged('window-removed'));
+  chrome.windows?.onFocusChanged?.addListener(() => notifySnapshotChanged('window-focused'));
+  chrome.storage?.onChanged?.addListener((_changes, areaName) => {
+    if (areaName === 'local') notifySnapshotChanged('storage-changed');
   });
 
   chrome.tabGroups.onUpdated.addListener((group) => {
-    if (group.title !== undefined) void syncGroupName(group.id, group.title);
+    if (group.title !== undefined) {
+      void syncGroupName(group.id, group.title);
+      notifySnapshotChanged('tab-group-updated');
+    }
   });
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message: BackgroundMessage, _sender, sendResponse) => {
     if (message?.type === 'organize-current-window') {
-      void getSettings()
-        .then((settings) => settings.organizeAllWindows ? organizeAllWindows() : organizeCurrentWindow())
-        .then((grouped) => sendResponse({ grouped }));
-      return true;
+      return respondAsync(
+        () => getSettings().then((settings) => settings.organizeAllWindows ? organizeAllWindows() : organizeCurrentWindow()).then((grouped) => ({ grouped })),
+        sendResponse,
+      );
     }
 
     if (message?.type === 'popup-state') {
-      void Promise.all([getSettings(), chrome.tabs.query({ currentWindow: true })]).then(([settings, tabs]) =>
-        sendResponse({ enabled: settings.enabled, groupCount: settings.groups.filter((group) => group.enabled).length, tabCount: tabs.length }),
+      return respondAsync(
+        () => Promise.all([getSettings(), chrome.tabs.query({ currentWindow: true })]).then(([settings, tabs]) => ({ enabled: settings.enabled, groupCount: settings.groups.filter((group) => group.enabled).length, tabCount: tabs.length })),
+        sendResponse,
       );
-      return true;
     }
+
+    if (message?.type === 'get-snapshot') return respondAsync(readSnapshot, sendResponse);
+    if (message?.type === 'save-window-tabs') return respondAsync(() => saveTabs(undefined, typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
+    if (message?.type === 'save-tabs') return respondAsync(() => saveTabs(uniqueNumbers(message.tabIds), typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
+    if (message?.type === 'restore-tab') return respondAsync(() => restoreSavedTab(String(message.groupId), String(message.savedTabId)), sendResponse);
+    if (message?.type === 'restore-group') return respondAsync(() => restoreSavedGroup(String(message.groupId)), sendResponse);
+    if (message?.type === 'restore-all') return respondAsync(restoreAllSavedGroups, sendResponse);
+    if (message?.type === 'delete-group') return respondAsync(() => deleteSavedGroup(String(message.groupId)), sendResponse);
+    if (message?.type === 'delete-tab') return respondAsync(() => deleteSavedTab(String(message.groupId), String(message.savedTabId)), sendResponse);
+    if (message?.type === 'rename-group') return respondAsync(() => renameSavedGroup(String(message.groupId), typeof message.name === 'string' ? message.name : ''), sendResponse);
+    if (message?.type === 'close-tabs') return respondAsync(() => closeTabs(uniqueNumbers(message.tabIds)), sendResponse);
+    if (message?.type === 'focus-tab' && typeof message.tabId === 'number') return respondAsync(() => focusTab(message.tabId as number), sendResponse);
+    if (message?.type === 'open-tab') return respondAsync(() => openTab(message), sendResponse);
+    if (message?.type === 'open-dashboard') return respondAsync(openDashboard, sendResponse);
   });
 });

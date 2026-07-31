@@ -70,6 +70,16 @@ describe('PopupApp', () => {
     });
   });
 
+  it('asks the background to open the tab manager', async () => {
+    render(<PopupApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开标签管理' }));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-dashboard' });
+    });
+  });
+
   it('shows a paused icon when automatic grouping is disabled', async () => {
     sendMessage.mockImplementation(async (message: { type: string }) => {
       if (message.type === 'popup-state') return { enabled: false, groupCount: 1, tabCount: 3 };
