@@ -74,8 +74,8 @@ function formatDate(timestamp: number) {
 }
 
 function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) {
-  if (!favIconUrl) return <span className="tab-icon grid size-8 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={16} strokeWidth={1.8} /></span>;
-  return <img alt="" className="tab-icon size-8 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
+  if (!favIconUrl) return <span className="tab-icon grid size-7 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={15} strokeWidth={1.8} /></span>;
+  return <img alt="" className="tab-icon size-7 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
 }
 
 export function DashboardApp() {
@@ -170,9 +170,9 @@ export function DashboardApp() {
               const selected = selectedTabs[window.id] ?? [];
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
-              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-3 py-3 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
+              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
                 <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
-                <button className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
+                <button className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
                 </button>
@@ -221,7 +221,7 @@ export function DashboardApp() {
                   {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
                 </Card.Header>
                 <Card.Content className="pt-0"><div className="border-y border-default">
-                  {visibleTabs.map((tab) => <div className="tab-row flex items-center gap-3 py-3" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-1"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: group.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: group.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: group.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
+                  {visibleTabs.map((tab) => <div className="tab-row flex items-center gap-2 py-2" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-0.5"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: group.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: group.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: group.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
                 </div></Card.Content>
               </Card>;
             })}
