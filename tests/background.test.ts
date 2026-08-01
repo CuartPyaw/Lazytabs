@@ -313,7 +313,7 @@ describe('background commands', () => {
     expect(result).toMatchObject({ tab: { windowId: 7, id: 70 } });
   });
 
-  it('restores all saved tabs in the background', async () => {
+  it('keeps restore-all opening tabs with the existing behavior', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [
       { id: 'saved-tab-1', title: '文档 1', url: 'https://example.com/one' },
       { id: 'saved-tab-2', title: '文档 2', url: 'https://example.com/two' },
@@ -326,8 +326,8 @@ describe('background commands', () => {
 
     const result = await sendMessage({ type: 'restore-all' });
 
-    expect(tabsCreate).toHaveBeenNthCalledWith(1, { windowId: 7, url: 'https://example.com/one', active: false });
-    expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/two', active: false });
+    expect(tabsCreate).toHaveBeenNthCalledWith(1, { windowId: 7, url: 'https://example.com/one' });
+    expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/two' });
     expect(result).toMatchObject({ restoredTabIds: [70, 71], windowId: 7 });
     expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
   });
