@@ -32,15 +32,6 @@ const sendMessage = vi.fn();
 const messageListeners = new Set<(message: { type?: string }) => void>();
 const storageChangedListeners = new Set<(changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void>();
 const storedSettings = { theme: 'dark', groups: [] };
-const dragData = () => {
-  const values = new Map<string, string>();
-  return {
-    effectAllowed: 'none',
-    dropEffect: 'none',
-    setData: (type: string, value: string) => values.set(type, value),
-    getData: (type: string) => values.get(type) ?? '',
-  };
-};
 let activeSnapshot = snapshot;
 
 beforeEach(() => {
@@ -104,11 +95,11 @@ describe('DashboardApp', () => {
 
     const tabButton = screen.getByText('GitLab').closest('button');
     expect(tabButton).toBeTruthy();
-    fireEvent.dragStart(tabButton!);
+    fireEvent.pointerDown(tabButton!, { button: 0 });
     const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
     expect(savedGroup).toBeTruthy();
-    fireEvent.dragOver(savedGroup!);
-    fireEvent.drop(savedGroup!);
+    fireEvent.pointerEnter(savedGroup!);
+    fireEvent.pointerUp(savedGroup!);
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 2, tabIds: [20] }));
   });
 
@@ -118,8 +109,16 @@ describe('DashboardApp', () => {
     expect(await screen.findByText('GitHub')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /收纳选中/ })).toBeNull();
     expect(screen.queryByRole('button', { name: '关闭选中' })).toBeNull();
-    expect(screen.getByText('GitHub').closest('button')?.getAttribute('draggable')).toBe('true');
-    expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
+    expect(screen.getByText('GitHub').closest('button')?.className).toContain('cursor-grab');
+    expect(screen.getByText('GitHub').closest('button')?.getAttribute('draggable')).toBe('false');
+    const fixedTabButton = screen.getByText('固定页').closest('button');
+    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
+    expect(fixedTabButton?.getAttribute('draggable')).toBe('false');
+    expect(savedGroup).toBeTruthy();
+    fireEvent.pointerDown(fixedTabButton!, { button: 0 });
+    fireEvent.pointerEnter(savedGroup!);
+    fireEvent.pointerUp(savedGroup!);
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'save-tabs' }));
   });
 
   it('keeps dashboard columns and cards within their grid tracks', async () => {
@@ -155,39 +154,34 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
   });
 
-  it('saves a dragged restorable tab while leaving fixed tabs undraggable', async () => {
+  it('saves a held restorable tab while leaving fixed tabs unavailable for archiving', async () => {
     render(<DashboardApp />);
 
     const tabButton = (await screen.findByText('GitHub')).closest('button');
     expect(tabButton).toBeTruthy();
-    const dataTransfer = dragData();
-    fireEvent.dragStart(tabButton!, { dataTransfer });
-    fireEvent.dragEnd(tabButton!);
+    fireEvent.pointerDown(tabButton!, { button: 0 });
     expect(screen.queryByText('收纳框')).toBeNull();
     const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
     expect(savedGroup).toBeTruthy();
-    fireEvent.dragOver(savedGroup!, { dataTransfer });
-    fireEvent.drop(savedGroup!, { dataTransfer });
+    fireEvent.pointerEnter(savedGroup!);
+    fireEvent.pointerUp(savedGroup!);
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
     expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
   });
 
-  it('keeps the dragged tab available when the drop lands on the saved group card', async () => {
+  it('archives a tab by holding it and releasing over an existing saved group', async () => {
     render(<DashboardApp />);
 
     const tabButton = (await screen.findByText('GitHub')).closest('button');
     const savedGroupCard = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
-    const dataTransfer = dragData();
-    const emptyDropData = dragData();
     expect(tabButton).toBeTruthy();
     expect(savedGroupCard).toBeTruthy();
 
-    fireEvent.dragStart(tabButton!, { dataTransfer });
-    fireEvent.dragEnd(tabButton!);
-    fireEvent.dragOver(savedGroupCard!, { dataTransfer: emptyDropData });
-    fireEvent.drop(savedGroupCard!, { dataTransfer: emptyDropData });
+    fireEvent.pointerDown(tabButton!, { button: 0 });
+    fireEvent.pointerEnter(savedGroupCard!);
+    fireEvent.pointerUp(savedGroupCard!);
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
   });
