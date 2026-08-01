@@ -168,6 +168,30 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
   });
 
+  it('does not let an older snapshot restore cleared saved tabs', async () => {
+    let snapshotRequest = 0;
+    let resolveOlder: ((value: typeof snapshot) => void) | undefined;
+    let resolveLatest: ((value: typeof snapshot) => void) | undefined;
+    sendMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type !== 'get-snapshot') return {};
+      snapshotRequest += 1;
+      if (snapshotRequest === 1) return snapshot;
+      if (snapshotRequest === 2) return new Promise<typeof snapshot>((resolve) => { resolveOlder = resolve; });
+      return new Promise<typeof snapshot>((resolve) => { resolveLatest = resolve; });
+    });
+    render(<DashboardApp />);
+    expect(await screen.findByText('文档')).toBeTruthy();
+
+    messageListeners.forEach((listener) => listener({ type: 'snapshot-changed' }));
+    messageListeners.forEach((listener) => listener({ type: 'snapshot-changed' }));
+    resolveLatest?.({ ...snapshot, savedTabGroups: [{ ...snapshot.savedTabGroups[0], tabs: [] }] });
+    await waitFor(() => expect(screen.queryByText('文档')).toBeNull());
+    resolveOlder?.(snapshot);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('文档')).toBeNull();
+  });
+
   it('saves all restorable tabs in a browser group', async () => {
     render(<DashboardApp />);
 

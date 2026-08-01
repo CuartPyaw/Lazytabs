@@ -1,6 +1,6 @@
 import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
 import { CircleAlert, FolderArchive, Globe2, Layers3, RotateCcw, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
 import { DEFAULT_SAVED_TAB_GROUP_ID, DEFAULT_SAVED_TAB_GROUP_NAME } from '../../src/lib/saved-tabs';
@@ -75,6 +75,7 @@ export function DashboardApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string>();
+  const snapshotRequestRef = useRef(0);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -91,11 +92,14 @@ export function DashboardApp() {
   }, [setTheme]);
 
   async function loadSnapshot() {
+    const requestId = ++snapshotRequestRef.current;
     try {
       const nextSnapshot = await chrome.runtime.sendMessage({ type: 'get-snapshot' }) as Snapshot & { error?: string };
       if (nextSnapshot.error) throw new Error(nextSnapshot.error);
+      if (requestId !== snapshotRequestRef.current) return;
       setSnapshot(nextSnapshot);
     } catch (reason) {
+      if (requestId !== snapshotRequestRef.current) return;
       setError(reason instanceof Error && reason.message ? reason.message : '加载标签数据失败。');
     }
   }
