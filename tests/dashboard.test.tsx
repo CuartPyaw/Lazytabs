@@ -168,6 +168,28 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
   });
 
+  it('opens every saved tab in the background from the saved group card', async () => {
+    activeSnapshot = {
+      ...snapshot,
+      savedTabGroups: [{
+        ...snapshot.savedTabGroups[0],
+        tabs: [
+          ...snapshot.savedTabGroups[0].tabs,
+          { id: 'saved-2', title: '文档 2', url: 'https://example.com/other' },
+        ],
+      }],
+    };
+    render(<DashboardApp />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '恢复默认收纳组' }));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' });
+      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-2' });
+    });
+    expect(sendMessage).not.toHaveBeenCalledWith({ type: 'restore-group', groupId: 'group-1' });
+  });
+
   it('does not let an older snapshot restore cleared saved tabs', async () => {
     let snapshotRequest = 0;
     let resolveOlder: ((value: typeof snapshot) => void) | undefined;
@@ -201,10 +223,10 @@ describe('DashboardApp', () => {
   });
 
   it('shows background message errors', async () => {
-    sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'restore-group' ? { error: '无法恢复' } : snapshot);
+    sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'restore-all' ? { error: '无法恢复' } : snapshot);
     render(<DashboardApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '恢复默认收纳组' }));
+    fireEvent.click(await screen.findByRole('button', { name: '恢复全部' }));
 
     expect(await screen.findByText('无法恢复')).toBeTruthy();
   });

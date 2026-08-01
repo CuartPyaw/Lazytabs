@@ -132,6 +132,19 @@ export function DashboardApp() {
   const visibleSavedTabs = savedGroup.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
   const hasSavedTabs = savedGroup.tabs.length > 0;
 
+  async function openSavedGroupTabs() {
+    try {
+      for (const tab of savedGroup.tabs) {
+        const response = await chrome.runtime.sendMessage({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id }) as { error?: unknown };
+        if (typeof response?.error === 'string') throw new Error(response.error);
+      }
+      setError(undefined);
+      await loadSnapshot();
+    } catch (reason) {
+      setError(reason instanceof Error && reason.message ? reason.message : '操作失败，请重试。');
+    }
+  }
+
   function handleTabClick(windowId: number, tab: BrowserTab) {
     if (!tab.restorable) {
       void send({ type: 'focus-tab', tabId: tab.id });
@@ -204,7 +217,7 @@ export function DashboardApp() {
             {snapshot && <div aria-label={`收纳组 ${savedGroup.name}`} className="min-w-0" role="region"><Card className="w-full min-w-0 overflow-hidden">
               <Card.Header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-48 flex-1"><Card.Title>{savedGroup.name}</Card.Title><Card.Description>{savedGroup.tabs.length} 项 · 默认有效收纳组</Card.Description></div>
-                <Button isDisabled={!hasSavedTabs} isIconOnly aria-label="恢复默认收纳组" size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: savedGroup.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button>
+                <Button isDisabled={!hasSavedTabs} isIconOnly aria-label="恢复默认收纳组" size="sm" variant="tertiary" onPress={() => void openSavedGroupTabs()}><RotateCcw size={16} strokeWidth={1.8} /></Button>
               </Card.Header>
               <Card.Content className="pt-0"><div className="border-y border-default">
                 {!visibleSavedTabs.length && <p className="m-0 py-6 text-center text-sm text-muted">{hasSavedTabs ? '没有匹配的标签。' : '暂无标签，点击左侧网页即可加入。'}</p>}
