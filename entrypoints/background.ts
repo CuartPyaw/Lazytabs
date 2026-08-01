@@ -313,7 +313,7 @@ async function openTab(message: BackgroundMessage) {
   if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');
 
   const windowId = typeof message.windowId === 'number' ? message.windowId : await currentWindowId();
-  const tab = await chrome.tabs.create({ windowId, url });
+  const tab = await chrome.tabs.create({ windowId, url, active: false });
   if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
   return { tab: serializeTab(tab, windowId) };
 }

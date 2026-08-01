@@ -157,6 +157,18 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'default-saved-group', windowId: 1, tabIds: [10] }));
   });
 
+  it('opens a saved tab in the background without a per-tab restore button', async () => {
+    render(<DashboardApp />);
+
+    const savedTabButton = (await screen.findByText('文档')).closest('button');
+    expect(savedTabButton).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '恢复 文档' })).toBeNull();
+
+    fireEvent.click(savedTabButton!);
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
+  });
+
   it('saves all restorable tabs in a browser group', async () => {
     render(<DashboardApp />);
 

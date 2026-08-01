@@ -1,5 +1,5 @@
 import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
-import { CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { CircleAlert, FolderArchive, Globe2, Layers3, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
@@ -205,7 +205,7 @@ export function DashboardApp() {
               </Card.Header>
               <Card.Content className="pt-0"><div className="border-y border-default">
                 {!visibleSavedTabs.length && <p className="m-0 py-6 text-center text-sm text-muted">{hasSavedTabs ? '没有匹配的标签。' : '暂无标签，点击左侧网页即可加入。'}</p>}
-                {visibleSavedTabs.map((tab) => <div className="tab-row flex items-center gap-2 py-2" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-0.5"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: savedGroup.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: savedGroup.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
+                {visibleSavedTabs.map((tab) => <div className="tab-row flex items-center gap-2 py-2" key={tab.id}><button aria-label={`打开 ${tab.title}`} className="flex min-w-0 flex-1 cursor-pointer select-none items-center gap-2 text-left" title="点击在后台打开" type="button" onClick={() => void send({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id })}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span></button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: savedGroup.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>)}
               </div></Card.Content>
             </Card></div>}
           </section>

@@ -282,8 +282,26 @@ describe('background commands', () => {
     const opened = await sendMessage({ type: 'open-tab', groupId: 'saved-group', savedTabId: 'saved-tab' });
 
     expect(tabsCreate).toHaveBeenNthCalledWith(1, { windowId: 7, url: 'https://example.com/docs' });
-    expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/docs' });
+    expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/docs', active: false });
     expect(restored).toMatchObject({ windowId: 7, restoredTabId: 70 });
     expect(opened).toMatchObject({ tab: { windowId: 7, id: 71 } });
+  });
+
+  it('keeps restore-all opening tabs with the existing behavior', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [
+      { id: 'saved-tab-1', title: '文档 1', url: 'https://example.com/one' },
+      { id: 'saved-tab-2', title: '文档 2', url: 'https://example.com/two' },
+    ] }];
+    getSettings.mockResolvedValue({ savedTabGroups, retainRestoredGroups: true });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate
+      .mockResolvedValueOnce({ id: 70, windowId: 7, url: 'https://example.com/one' } as chrome.tabs.Tab)
+      .mockResolvedValueOnce({ id: 71, windowId: 7, url: 'https://example.com/two' } as chrome.tabs.Tab);
+
+    const result = await sendMessage({ type: 'restore-all' });
+
+    expect(tabsCreate).toHaveBeenNthCalledWith(1, { windowId: 7, url: 'https://example.com/one' });
+    expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/two' });
+    expect(result).toMatchObject({ restoredTabIds: [70, 71], windowId: 7 });
   });
 });
