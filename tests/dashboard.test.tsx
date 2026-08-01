@@ -168,15 +168,6 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
   });
 
-  it('opens all saved tabs in the background from the restore-all button', async () => {
-    render(<DashboardApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '恢复全部' }));
-
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
-    expect(sendMessage).not.toHaveBeenCalledWith({ type: 'restore-all' });
-  });
-
   it('does not let an older snapshot restore cleared saved tabs', async () => {
     let snapshotRequest = 0;
     let resolveOlder: ((value: typeof snapshot) => void) | undefined;

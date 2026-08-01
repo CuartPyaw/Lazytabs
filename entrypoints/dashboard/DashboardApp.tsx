@@ -128,19 +128,6 @@ export function DashboardApp() {
     }
   }
 
-  async function openAllSavedTabs() {
-    try {
-      for (const tab of savedGroup.tabs) {
-        const response = await chrome.runtime.sendMessage({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id }) as { error?: unknown };
-        if (typeof response?.error === 'string') throw new Error(response.error);
-      }
-      setError(undefined);
-      await loadSnapshot();
-    } catch (reason) {
-      setError(reason instanceof Error && reason.message ? reason.message : '操作失败，请重试。');
-    }
-  }
-
   const savedGroup = snapshot?.savedTabGroups[0] ?? { id: DEFAULT_SAVED_TAB_GROUP_ID, name: DEFAULT_SAVED_TAB_GROUP_NAME, createdAt: 0, tabs: [] };
   const visibleSavedTabs = savedGroup.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
   const hasSavedTabs = savedGroup.tabs.length > 0;
@@ -162,7 +149,7 @@ export function DashboardApp() {
             <div><p className="m-0 font-semibold">LazyTabs</p><p className="m-0 text-xs text-muted">概览</p></div>
           </div>
           <div className="relative min-w-52 flex-1 sm:max-w-xl"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted" size={17} strokeWidth={1.8} /><Input aria-label="全局搜索" className="w-full pl-9" placeholder="搜索标题或 URL" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-          <Button isDisabled={!hasSavedTabs} size="sm" variant="secondary" onPress={() => void openAllSavedTabs()}><RotateCcw size={16} strokeWidth={1.8} />恢复全部</Button>
+          <Button isDisabled={!hasSavedTabs} size="sm" variant="secondary" onPress={() => void send({ type: 'restore-all' })}><RotateCcw size={16} strokeWidth={1.8} />恢复全部</Button>
         </div>
       </header>
 
