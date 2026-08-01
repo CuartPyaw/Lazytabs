@@ -32,6 +32,15 @@ const sendMessage = vi.fn();
 const messageListeners = new Set<(message: { type?: string }) => void>();
 const storageChangedListeners = new Set<(changes: { settings?: chrome.storage.StorageChange }, areaName: string) => void>();
 const storedSettings = { theme: 'dark', groups: [] };
+const dragData = () => {
+  const values = new Map<string, string>();
+  return {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    setData: (type: string, value: string) => values.set(type, value),
+    getData: (type: string) => values.get(type) ?? '',
+  };
+};
 let activeSnapshot = snapshot;
 
 beforeEach(() => {
@@ -93,10 +102,12 @@ describe('DashboardApp', () => {
       expect(screen.queryByText('GitHub')).toBeNull();
     });
 
-    const tabRow = screen.getByText('GitLab').closest('.tab-row');
-    expect(tabRow).toBeTruthy();
-    fireEvent.dragStart(tabRow!);
-    fireEvent.drop(screen.getByRole('region', { name: '收纳组 窗口 1' }));
+    const tabButton = screen.getByText('GitLab').closest('button');
+    expect(tabButton).toBeTruthy();
+    fireEvent.dragStart(tabButton!);
+    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' });
+    fireEvent.dragOver(savedGroup);
+    fireEvent.drop(savedGroup);
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 2, tabIds: [20] }));
   });
 
@@ -106,8 +117,8 @@ describe('DashboardApp', () => {
     expect(await screen.findByText('GitHub')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /收纳选中/ })).toBeNull();
     expect(screen.queryByRole('button', { name: '关闭选中' })).toBeNull();
-    expect(screen.getByText('GitHub').closest('.tab-row')?.getAttribute('draggable')).toBe('true');
-    expect(screen.getByText('固定页').closest('.tab-row')?.getAttribute('draggable')).toBe('false');
+    expect(screen.getByText('GitHub').closest('button')?.getAttribute('draggable')).toBe('true');
+    expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
   });
 
   it('keeps dashboard columns and cards within their grid tracks', async () => {
@@ -146,14 +157,18 @@ describe('DashboardApp', () => {
   it('saves a dragged restorable tab while leaving fixed tabs undraggable', async () => {
     render(<DashboardApp />);
 
-    const tabRow = (await screen.findByText('GitHub')).closest('.tab-row');
-    expect(tabRow).toBeTruthy();
-    fireEvent.dragStart(tabRow!);
+    const tabButton = (await screen.findByText('GitHub')).closest('button');
+    expect(tabButton).toBeTruthy();
+    const dataTransfer = dragData();
+    fireEvent.dragStart(tabButton!, { dataTransfer });
+    fireEvent.dragEnd(tabButton!);
     expect(screen.queryByText('收纳框')).toBeNull();
-    fireEvent.drop(screen.getByRole('region', { name: '收纳组 窗口 1' }));
+    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' });
+    fireEvent.dragOver(savedGroup, { dataTransfer });
+    fireEvent.drop(savedGroup, { dataTransfer });
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
-    expect(screen.getByText('固定页').closest('.tab-row')?.getAttribute('draggable')).toBe('false');
+    expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
   });
 

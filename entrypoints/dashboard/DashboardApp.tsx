@@ -1,6 +1,6 @@
 import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
 import { Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
-import { type DragEvent, useEffect, useState } from 'react';
+import { type DragEvent, useEffect, useRef, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
 
@@ -51,6 +51,8 @@ type Snapshot = {
 
 type DraggedTab = { windowId: number; tabId: number };
 
+const draggedTabDataType = 'application/x-lazytabs-tab';
+
 const groupColorClasses: Record<string, string> = {
   grey: 'bg-gray-400',
   blue: 'bg-blue-400',
@@ -80,7 +82,7 @@ function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) 
 export function DashboardApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [search, setSearch] = useState('');
-  const [draggedTab, setDraggedTab] = useState<DraggedTab>();
+  const draggedTabRef = useRef<DraggedTab | undefined>(undefined);
   const [dropGroupId, setDropGroupId] = useState<string>();
   const [editingGroupId, setEditingGroupId] = useState<string>();
   const [groupName, setGroupName] = useState('');
@@ -142,23 +144,39 @@ export function DashboardApp() {
   const savedGroups = [...(snapshot?.savedTabGroups ?? [])].sort((left, right) => right.createdAt - left.createdAt);
   const visibleGroupCount = savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).length;
 
-  function beginTabDrag(event: DragEvent<HTMLDivElement>, windowId: number, tab: BrowserTab) {
+  function beginTabDrag(event: DragEvent<HTMLElement>, windowId: number, tab: BrowserTab) {
     if (!tab.restorable) {
       event.preventDefault();
       return;
     }
-    setDraggedTab({ windowId, tabId: tab.id });
+    const draggedTab = { windowId, tabId: tab.id };
+    draggedTabRef.current = draggedTab;
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(tab.id));
+      const payload = JSON.stringify(draggedTab);
+      event.dataTransfer.setData(draggedTabDataType, payload);
+      event.dataTransfer.setData('text/plain', payload);
     }
+  }
+
+  function readDraggedTab(event: DragEvent<HTMLDivElement>) {
+    const payload = event.dataTransfer?.getData(draggedTabDataType) || event.dataTransfer?.getData('text/plain');
+    if (payload) {
+      try {
+        const value = JSON.parse(payload) as Partial<DraggedTab>;
+        if (Number.isInteger(value.windowId) && Number.isInteger(value.tabId)) return { windowId: value.windowId, tabId: value.tabId };
+      } catch {
+        // Fall back to the synchronous drag ref for older/native drag payloads.
+      }
+    }
+    return draggedTabRef.current;
   }
 
   function dropDraggedTab(event: DragEvent<HTMLDivElement>, groupId: string) {
     event.preventDefault();
     setDropGroupId(undefined);
-    const tab = draggedTab;
-    setDraggedTab(undefined);
+    const tab = readDraggedTab(event);
+    draggedTabRef.current = undefined;
     if (tab) void send({ type: 'save-tabs', groupId, windowId: tab.windowId, tabIds: [tab.tabId] });
   }
 
@@ -184,8 +202,8 @@ export function DashboardApp() {
             {currentWindows.map((window, index) => {
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
-              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''} ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : ''}`} draggable={tab.restorable} key={tab.id} title={tab.restorable ? '长按拖动到收纳组' : undefined} onDragEnd={() => { setDraggedTab(undefined); setDropGroupId(undefined); }} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
-                <button className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
+              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
+                <button className={`flex min-w-0 flex-1 items-center gap-2 text-left ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`} draggable={tab.restorable} title={tab.restorable ? '长按拖动到收纳组' : undefined} type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })} onDragEnd={() => { draggedTabRef.current = undefined; setDropGroupId(undefined); }} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
                 </button>
