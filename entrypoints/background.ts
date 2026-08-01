@@ -293,19 +293,27 @@ async function focusTab(tabId: number) {
 }
 
 async function openTab(message: BackgroundMessage) {
-  let url: string | undefined;
-  if (typeof message.url === 'string') url = message.url;
-  if (typeof message.groupId === 'string' && typeof message.savedTabId === 'string') {
-    const rawSettings = await getSettings();
-    const settings = normalizeSettings(rawSettings);
-    url = settings.savedTabGroups?.find((group) => group.id === message.groupId)?.tabs.find((tab) => tab.id === message.savedTabId)?.url;
-  }
-  if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');
+  return withSavedTabsLock(async () => {
+    let url: string | undefined;
+    let settings: Settings | undefined;
+    const groupId = typeof message.groupId === 'string' ? message.groupId : undefined;
+    const savedTabId = typeof message.savedTabId === 'string' ? message.savedTabId : undefined;
+    if (typeof message.url === 'string') url = message.url;
+    if (groupId && savedTabId) {
+      settings = normalizeSettings(await getSettings());
+      url = settings.savedTabGroups?.find((group) => group.id === groupId)?.tabs.find((tab) => tab.id === savedTabId)?.url;
+    }
+    if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');
 
-  const windowId = typeof message.windowId === 'number' ? message.windowId : await currentWindowId();
-  const tab = await chrome.tabs.create({ windowId, url, active: false });
-  if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
-  return { tab: serializeTab(tab, windowId) };
+    const windowId = typeof message.windowId === 'number' ? message.windowId : await currentWindowId();
+    const tab = await chrome.tabs.create({ windowId, url, active: false });
+    if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
+    if (settings && groupId && savedTabId) {
+      await saveSettings(removeSavedTab(settings, groupId, savedTabId));
+      notifySnapshotChanged('restored-tab');
+    }
+    return { tab: serializeTab(tab, windowId) };
+  });
 }
 
 async function openDashboard(targetWindowId?: number) {

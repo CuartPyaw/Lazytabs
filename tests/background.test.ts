@@ -300,6 +300,19 @@ describe('background commands', () => {
     expect(result).toMatchObject({ removed: true, restoredTabIds: [70] });
   });
 
+  it('opens an individual saved tab in the background and removes its record', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate.mockResolvedValue({ id: 70, windowId: 7, url: 'https://example.com/docs' } as chrome.tabs.Tab);
+
+    const result = await sendMessage({ type: 'open-tab', groupId: 'saved-group', savedTabId: 'saved-tab' });
+
+    expect(tabsCreate).toHaveBeenCalledWith({ windowId: 7, url: 'https://example.com/docs', active: false });
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
+    expect(result).toMatchObject({ tab: { windowId: 7, id: 70 } });
+  });
+
   it('keeps restore-all opening tabs with the existing behavior', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [
       { id: 'saved-tab-1', title: '文档 1', url: 'https://example.com/one' },
