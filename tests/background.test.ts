@@ -141,7 +141,7 @@ describe('background commands', () => {
 
   it('returns only the focused normal window and excludes its dashboard tab', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
-    getSettings.mockResolvedValue({ savedTabGroups, retainRestoredGroups: true });
+    getSettings.mockResolvedValue({ savedTabGroups });
     windowsGetAll.mockResolvedValue([
       { id: 1, type: 'normal', focused: false, tabs: [{ id: 11, windowId: 1, url: 'https://other.example' }] },
       {
@@ -181,7 +181,6 @@ describe('background commands', () => {
         }],
       }],
       savedTabGroups,
-      settings: { retainRestoredGroups: true },
     });
   });
 
@@ -195,7 +194,7 @@ describe('background commands', () => {
 
     const snapshot = await sendMessage({ type: 'get-snapshot' });
 
-    expect(snapshot).toMatchObject({ windows: [], savedTabGroups, settings: { retainRestoredGroups: false } });
+    expect(snapshot).toMatchObject({ windows: [], savedTabGroups });
   });
 
   it('excludes the dashboard tab from popup-state count', async () => {
@@ -272,7 +271,7 @@ describe('background commands', () => {
 
   it('restores and opens saved tabs in the focused normal window', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
-    getSettings.mockResolvedValue({ savedTabGroups, retainRestoredGroups: true });
+    getSettings.mockResolvedValue({ savedTabGroups });
     windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
     tabsCreate
       .mockResolvedValueOnce({ id: 70, windowId: 7, url: 'https://example.com/docs' } as chrome.tabs.Tab)
@@ -285,6 +284,20 @@ describe('background commands', () => {
     expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/docs', active: false });
     expect(restored).toMatchObject({ windowId: 7, restoredTabId: 70 });
     expect(opened).toMatchObject({ tab: { windowId: 7, id: 71 } });
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
+  });
+
+  it('removes restored tabs from the saved group', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate.mockResolvedValue({ id: 70, windowId: 7, url: 'https://example.com/docs' } as chrome.tabs.Tab);
+
+    const result = await sendMessage({ type: 'restore-group', groupId: 'saved-group' });
+
+    expect(tabsCreate).toHaveBeenCalledWith({ windowId: 7, url: 'https://example.com/docs' });
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
+    expect(result).toMatchObject({ removed: true, restoredTabIds: [70] });
   });
 
   it('keeps restore-all opening tabs with the existing behavior', async () => {
@@ -292,7 +305,7 @@ describe('background commands', () => {
       { id: 'saved-tab-1', title: '文档 1', url: 'https://example.com/one' },
       { id: 'saved-tab-2', title: '文档 2', url: 'https://example.com/two' },
     ] }];
-    getSettings.mockResolvedValue({ savedTabGroups, retainRestoredGroups: true });
+    getSettings.mockResolvedValue({ savedTabGroups });
     windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
     tabsCreate
       .mockResolvedValueOnce({ id: 70, windowId: 7, url: 'https://example.com/one' } as chrome.tabs.Tab)
@@ -303,5 +316,6 @@ describe('background commands', () => {
     expect(tabsCreate).toHaveBeenNthCalledWith(1, { windowId: 7, url: 'https://example.com/one' });
     expect(tabsCreate).toHaveBeenNthCalledWith(2, { windowId: 7, url: 'https://example.com/two' });
     expect(result).toMatchObject({ restoredTabIds: [70, 71], windowId: 7 });
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
   });
 });

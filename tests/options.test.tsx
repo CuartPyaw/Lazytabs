@@ -9,7 +9,6 @@ const storedSettings = {
   enabled: true,
   collapseGroups: true,
   organizeAllWindows: false,
-  retainRestoredGroups: false,
   theme: 'system' as const,
   groups: [{
     id: 'video', name: '视频', color: 'blue' as const, enabled: true,
@@ -52,12 +51,10 @@ describe('OptionsApp interactions', () => {
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
   });
 
-  it('persists keeping restored groups', async () => {
+  it('does not offer keeping restored groups', async () => {
     render(<OptionsApp />);
     fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    fireEvent.click(await screen.findByRole('switch', { name: '恢复后保留收纳记录' }));
-
-    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, retainRestoredGroups: true } }));
+    expect(screen.queryByRole('switch', { name: '恢复后保留收纳记录' })).toBeNull();
   });
 
   it('opens a group editor with nested matching rules', async () => {

@@ -94,9 +94,6 @@ async function readSnapshot() {
       }];
     }),
     savedTabGroups: settings.savedTabGroups ?? [],
-    settings: {
-      retainRestoredGroups: settings.retainRestoredGroups === true,
-    },
   };
 }
 
@@ -215,12 +212,9 @@ async function restoreSavedTab(groupId: string, savedTabId: string) {
     if (!group || !savedTab) throw new Error('找不到要恢复的收纳记录。');
 
     const { windowId, tabId } = await createTabInCurrentWindow(savedTab);
-    const keep = settings.retainRestoredGroups === true;
-    if (!keep) {
-      await saveSettings(removeSavedTab(settings, groupId, savedTabId));
-      notifySnapshotChanged('restored-tab');
-    }
-    return { groupId, savedTabId, restoredTabId: tabId, windowId, removed: !keep };
+    await saveSettings(removeSavedTab(settings, groupId, savedTabId));
+    notifySnapshotChanged('restored-tab');
+    return { groupId, savedTabId, restoredTabId: tabId, windowId, removed: true };
   });
 }
 
@@ -233,15 +227,14 @@ async function restoreSavedGroup(groupId: string) {
 
     const windowId = await currentWindowId();
     const result = await restoreGroup(settings, group, windowId);
-    const keep = settings.retainRestoredGroups === true;
-    if (!keep && result.failedSavedTabIds.length < group.tabs.length) {
+    if (result.failedSavedTabIds.length < group.tabs.length) {
       const savedTabGroups = settings.savedTabGroups.map((item) => item.id === groupId ? { ...item, tabs: result.remainingTabs } : item);
       await saveSettings({ ...settings, savedTabGroups });
       notifySnapshotChanged('restored-group');
     }
 
     const { remainingTabs: _remainingTabs, ...response } = result;
-    return { groupId, windowId, removed: !keep && result.failedSavedTabIds.length === 0, ...response };
+    return { groupId, windowId, removed: result.failedSavedTabIds.length === 0, ...response };
   });
 }
 
@@ -251,7 +244,6 @@ async function restoreAllSavedGroups() {
     const settings = normalizeSettings(rawSettings);
     const groups = settings.savedTabGroups;
     const windowId = await currentWindowId();
-    const keep = settings.retainRestoredGroups === true;
     const remainingGroups: SavedTabGroup[] = [];
     const restoredTabIds: number[] = [];
     const failedSavedTabIds: string[] = [];
@@ -262,15 +254,13 @@ async function restoreAllSavedGroups() {
       restoredTabIds.push(...result.restoredTabIds);
       failedSavedTabIds.push(...result.failedSavedTabIds);
       errors.push(...result.errors);
-      remainingGroups.push(keep ? group : { ...group, tabs: result.remainingTabs });
+      remainingGroups.push({ ...group, tabs: result.remainingTabs });
     }
 
-    if (!keep) {
-      await saveSettings({ ...settings, savedTabGroups: remainingGroups });
-      notifySnapshotChanged('restored-all');
-    }
+    await saveSettings({ ...settings, savedTabGroups: remainingGroups });
+    notifySnapshotChanged('restored-all');
 
-    return { windowId, restoredTabIds, failedSavedTabIds, errors, removed: !keep && failedSavedTabIds.length === 0 };
+    return { windowId, restoredTabIds, failedSavedTabIds, errors, removed: failedSavedTabIds.length === 0 };
   });
 }
 

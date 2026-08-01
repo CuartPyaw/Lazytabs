@@ -41,7 +41,6 @@ const themeOptions: { value: Theme; label: string }[] = [
 ];
 
 const latestReleaseUrl = 'https://api.github.com/repos/CuartPyaw/Lazytabs/releases/latest';
-type AppSettings = Settings & { retainRestoredGroups?: boolean };
 
 function isNewerVersion(latestVersion: string, currentVersion: string) {
   const latest = latestVersion.replace(/^v/, '').split('.').map(Number);
@@ -75,7 +74,7 @@ function cloneGroup(group: Group): GroupInput {
 }
 
 export function OptionsApp() {
-  const [settings, setSettings] = useState<AppSettings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system', retainRestoredGroups: false });
+  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -143,13 +142,6 @@ export function OptionsApp() {
   async function updateOrganizeAllWindows(organizeAllWindows: boolean) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, organizeAllWindows };
-    setSettings(next);
-    await saveSettings(next);
-  }
-
-  async function updateRetainRestoredGroups(retainRestoredGroups: boolean) {
-    const currentSettings = await getSettings();
-    const next = { ...currentSettings, retainRestoredGroups };
     setSettings(next);
     await saveSettings(next);
   }
@@ -312,7 +304,6 @@ export function OptionsApp() {
             <Card.Content className="grid gap-5">
               <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后自动折叠</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
-              <Switch aria-label="恢复后保留收纳记录" className="soft-switch" isSelected={settings.retainRestoredGroups ?? false} onChange={(retainRestoredGroups) => void updateRetainRestoredGroups(retainRestoredGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>恢复后保留收纳记录</Switch.Content></Switch>
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
                 <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出数据</Button>
                 <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => importInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入数据</Button>

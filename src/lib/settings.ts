@@ -8,7 +8,6 @@ export type Settings = {
   groups: Group[];
   theme: Theme;
   savedTabGroups?: SavedTabGroup[];
-  retainRestoredGroups?: boolean;
 };
 
 export type Theme = 'light' | 'dark' | 'system';
@@ -91,8 +90,8 @@ function isCurrentRule(value: unknown): value is CurrentRule {
 
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(settingsKey);
-  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[] | Group[]; rules?: LegacyRule[] | CurrentRule[] } | undefined;
-  const { groups, rules, savedTabGroups, retainRestoredGroups, ...settings } = value ?? {};
+  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[] | Group[]; rules?: LegacyRule[] | CurrentRule[]; retainRestoredGroups?: boolean } | undefined;
+  const { groups, rules, savedTabGroups, retainRestoredGroups: _retainRestoredGroups, ...settings } = value ?? {};
   const currentGroups = Array.isArray(groups) && groups.every(isCurrentGroup) ? groups : undefined;
 
   return {
@@ -100,7 +99,6 @@ export async function getSettings(): Promise<Settings> {
     ...settings,
     groups: currentGroups ?? (Array.isArray(groups) ? migrateLegacyGroups(groups as LegacyGroup[]) : Array.isArray(rules) ? rules.every(isCurrentRule) ? migrateCurrentRules(rules) : migrateLegacyRules(rules as LegacyRule[]) : []),
     ...(savedTabGroups === undefined ? {} : { savedTabGroups: isSavedTabGroups(savedTabGroups) ? normalizeSavedTabGroups(savedTabGroups) : normalizeSavedTabGroups() }),
-    ...(retainRestoredGroups === undefined ? {} : { retainRestoredGroups: retainRestoredGroups === true }),
   };
 }
 
@@ -115,7 +113,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function parseImportedSettings(value: unknown): Settings | undefined {
   if (!isRecord(value) || typeof value.enabled !== 'boolean' || typeof value.collapseGroups !== 'boolean' || typeof value.organizeAllWindows !== 'boolean' || !['light', 'dark', 'system'].includes(value.theme as Theme) || !Array.isArray(value.groups)) return undefined;
-  if (value.retainRestoredGroups !== undefined && typeof value.retainRestoredGroups !== 'boolean') return undefined;
   if (value.savedTabGroups !== undefined && !isSavedTabGroups(value.savedTabGroups)) return undefined;
 
   const groupIds = new Set<string>();
@@ -136,8 +133,9 @@ export function parseImportedSettings(value: unknown): Settings | undefined {
       }
     }
   }
+  const { retainRestoredGroups: _retainRestoredGroups, ...settings } = value;
   return {
-    ...value,
+    ...settings,
     ...(value.savedTabGroups === undefined ? {} : { savedTabGroups: normalizeSavedTabGroups(value.savedTabGroups as SavedTabGroup[]) }),
   } as Settings;
 }

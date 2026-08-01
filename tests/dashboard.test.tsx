@@ -17,7 +17,6 @@ const snapshot = {
     ],
   }],
   savedTabGroups: [{ id: 'group-1', name: '窗口 1', createdAt: 1, tabs: [{ id: 'saved-1', title: '文档', url: 'https://example.com/docs' }] }],
-  settings: { retainRestoredGroups: false },
 };
 
 const secondWindow = {

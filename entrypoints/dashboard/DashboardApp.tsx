@@ -47,7 +47,6 @@ type SavedTabGroup = {
 type Snapshot = {
   windows: BrowserWindow[];
   savedTabGroups: SavedTabGroup[];
-  settings: { retainRestoredGroups: boolean };
 };
 
 const groupColorClasses: Record<string, string> = {
