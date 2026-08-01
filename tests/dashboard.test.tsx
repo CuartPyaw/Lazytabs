@@ -75,7 +75,7 @@ describe('DashboardApp', () => {
     expect(screen.getByText('工作').previousElementSibling?.className).toContain('bg-blue-400');
   });
 
-  it('renders only the focused window and archives a dragged tab', async () => {
+  it('renders only the focused window and archives a dragged tab into an existing group', async () => {
     activeSnapshot = { ...snapshot, windows: [...snapshot.windows, secondWindow] };
     render(<DashboardApp />);
 
@@ -96,8 +96,8 @@ describe('DashboardApp', () => {
     const tabRow = screen.getByText('GitLab').closest('.tab-row');
     expect(tabRow).toBeTruthy();
     fireEvent.dragStart(tabRow!);
-    fireEvent.drop(screen.getByRole('region', { name: '收纳框' }));
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 2, tabIds: [20] }));
+    fireEvent.drop(screen.getByRole('region', { name: '收纳组 窗口 1' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 2, tabIds: [20] }));
   });
 
   it('removes selection actions and keeps fixed tabs out of drag archiving', async () => {
@@ -149,9 +149,10 @@ describe('DashboardApp', () => {
     const tabRow = (await screen.findByText('GitHub')).closest('.tab-row');
     expect(tabRow).toBeTruthy();
     fireEvent.dragStart(tabRow!);
-    fireEvent.drop(screen.getByRole('region', { name: '收纳框' }));
+    expect(screen.queryByText('收纳框')).toBeNull();
+    fireEvent.drop(screen.getByRole('region', { name: '收纳组 窗口 1' }));
 
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, tabIds: [10] }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
     expect(screen.getByText('固定页').closest('.tab-row')?.getAttribute('draggable')).toBe('false');
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
   });

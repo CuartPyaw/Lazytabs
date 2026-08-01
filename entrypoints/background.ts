@@ -132,7 +132,7 @@ async function closeTabs(tabIds: number[]): Promise<CloseTabsResult> {
   };
 }
 
-async function saveTabs(tabIds: number[] | undefined, windowId: number | undefined) {
+async function saveTabs(tabIds: number[] | undefined, windowId: number | undefined, groupId?: string) {
   return withSavedTabsLock(async () => {
     const selectedTabIds = tabIds ? uniqueNumbers(tabIds) : undefined;
     const { tabs, failedTabIds } = await getTabsForSave(selectedTabIds, windowId);
@@ -148,14 +148,21 @@ async function saveTabs(tabIds: number[] | undefined, windowId: number | undefin
 
     if (!savedTabs.length) throw new Error('没有可收纳的网页标签。');
 
-    const createdAt = Date.now();
+    const settings = await getSettings();
+    const targetGroup = groupId ? settings.savedTabGroups?.find((item) => item.id === groupId) : undefined;
+    if (groupId && !targetGroup) throw new Error('找不到要收纳的收纳组。');
+
     const windowIds = new Set(tabs.filter((tab) => savedTabs.some((item) => item.sourceTabId === tab.id)).map((tab) => tab.windowId).filter((id): id is number => id !== undefined));
     const windowLabel = windowIds.size === 1 ? `窗口 ${[...windowIds][0]}` : '多个窗口';
-    const group = createSavedTabGroup(savedTabs.map((item) => item.tab), windowLabel, createdAt);
-    const settings = await getSettings();
+    const group = targetGroup
+      ? { ...targetGroup, tabs: [...targetGroup.tabs, ...savedTabs.map((item) => item.tab)] }
+      : createSavedTabGroup(savedTabs.map((item) => item.tab), windowLabel);
+    const nextSettings = targetGroup
+      ? { ...settings, savedTabGroups: (settings.savedTabGroups ?? []).map((item) => item.id === targetGroup.id ? group : item) }
+      : appendSavedTabGroup(settings, group);
 
     // Persist before closing tabs so a browser API failure cannot lose the records.
-    await saveSettings(appendSavedTabGroup(settings, group));
+    await saveSettings(nextSettings);
     const closeResult = await closeTabs(savedTabs.map((item) => item.sourceTabId));
     notifySnapshotChanged('saved-tabs');
 
@@ -394,7 +401,7 @@ export default defineBackground(() => {
 
     if (message?.type === 'get-snapshot') return respondAsync(readSnapshot, sendResponse);
     if (message?.type === 'save-window-tabs') return respondAsync(() => saveTabs(undefined, typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
-    if (message?.type === 'save-tabs') return respondAsync(() => saveTabs(uniqueNumbers(message.tabIds), typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
+    if (message?.type === 'save-tabs') return respondAsync(() => saveTabs(uniqueNumbers(message.tabIds), typeof message.windowId === 'number' ? message.windowId : undefined, typeof message.groupId === 'string' ? message.groupId : undefined), sendResponse);
     if (message?.type === 'restore-tab') return respondAsync(() => restoreSavedTab(String(message.groupId), String(message.savedTabId)), sendResponse);
     if (message?.type === 'restore-group') return respondAsync(() => restoreSavedGroup(String(message.groupId)), sendResponse);
     if (message?.type === 'restore-all') return respondAsync(restoreAllSavedGroups, sendResponse);
