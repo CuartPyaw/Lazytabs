@@ -14,6 +14,9 @@ export type SavedTabGroup = {
   tabs: SavedTab[];
 };
 
+export const DEFAULT_SAVED_TAB_GROUP_ID = 'default-saved-group';
+export const DEFAULT_SAVED_TAB_GROUP_NAME = '默认收纳组';
+
 function nextId(prefix: string) {
   return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -33,14 +36,14 @@ export function toSavedTab(tab: Pick<chrome.tabs.Tab, 'url' | 'title' | 'favIcon
   };
 }
 
-function formatTimestamp(timestamp: number) {
-  const date = new Date(timestamp);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-export function createSavedTabGroup(tabs: SavedTab[], windowLabel: string, createdAt = Date.now()): SavedTabGroup {
-  return { id: nextId('group'), name: `${windowLabel} · ${formatTimestamp(createdAt)}`, createdAt, tabs };
+export function normalizeSavedTabGroups(groups?: SavedTabGroup[]): SavedTabGroup[] {
+  const firstGroup = groups?.[0];
+  return [{
+    id: firstGroup?.id ?? DEFAULT_SAVED_TAB_GROUP_ID,
+    name: firstGroup?.name ?? DEFAULT_SAVED_TAB_GROUP_NAME,
+    createdAt: firstGroup?.createdAt ?? 0,
+    tabs: (groups ?? []).flatMap((group) => group.tabs),
+  }];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,7 +56,7 @@ export function isSavedTabGroups(value: unknown): value is SavedTabGroup[] {
   const groupIds = new Set<string>();
   const tabIds = new Set<string>();
   return value.every((groupValue) => {
-    if (!isRecord(groupValue) || typeof groupValue.id !== 'string' || !groupValue.id || groupIds.has(groupValue.id) || typeof groupValue.name !== 'string' || !groupValue.name.trim() || typeof groupValue.createdAt !== 'number' || !Number.isFinite(groupValue.createdAt) || !Array.isArray(groupValue.tabs) || !groupValue.tabs.length) return false;
+    if (!isRecord(groupValue) || typeof groupValue.id !== 'string' || !groupValue.id || groupIds.has(groupValue.id) || typeof groupValue.name !== 'string' || !groupValue.name.trim() || typeof groupValue.createdAt !== 'number' || !Number.isFinite(groupValue.createdAt) || !Array.isArray(groupValue.tabs)) return false;
     groupIds.add(groupValue.id);
 
     return groupValue.tabs.every((tabValue) => {
@@ -64,17 +67,8 @@ export function isSavedTabGroups(value: unknown): value is SavedTabGroup[] {
   });
 }
 
-export function appendSavedTabGroup(settings: Settings, group: SavedTabGroup): Settings {
-  return { ...settings, savedTabGroups: [...(settings.savedTabGroups ?? []), group] };
-}
-
-export function removeSavedTabGroup(settings: Settings, groupId: string): Settings {
-  return { ...settings, savedTabGroups: (settings.savedTabGroups ?? []).filter((group) => group.id !== groupId) };
-}
-
 export function removeSavedTab(settings: Settings, groupId: string, tabId: string): Settings {
   const savedTabGroups = (settings.savedTabGroups ?? [])
-    .map((group) => group.id === groupId ? { ...group, tabs: group.tabs.filter((tab) => tab.id !== tabId) } : group)
-    .filter((group) => group.tabs.length);
+    .map((group) => group.id === groupId ? { ...group, tabs: group.tabs.filter((tab) => tab.id !== tabId) } : group);
   return { ...settings, savedTabGroups };
 }

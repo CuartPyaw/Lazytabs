@@ -1,8 +1,9 @@
 import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
-import { Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
+import { DEFAULT_SAVED_TAB_GROUP_ID, DEFAULT_SAVED_TAB_GROUP_NAME } from '../../src/lib/saved-tabs';
 
 type BrowserTab = {
   id: number;
@@ -66,10 +67,6 @@ function matchesSearch(search: string, title: string, url: string) {
   return !query || title.toLocaleLowerCase().includes(query) || url.toLocaleLowerCase().includes(query);
 }
 
-function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp);
-}
-
 function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) {
   if (!favIconUrl) return <span className="tab-icon grid size-6 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={14} strokeWidth={1.8} /></span>;
   return <img alt="" className="tab-icon size-6 shrink-0 rounded-md bg-default object-contain" draggable={false} src={favIconUrl} title={title} />;
@@ -78,8 +75,6 @@ function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) 
 export function DashboardApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [search, setSearch] = useState('');
-  const [editingGroupId, setEditingGroupId] = useState<string>();
-  const [groupName, setGroupName] = useState('');
   const [error, setError] = useState<string>();
   const { setTheme } = useTheme();
 
@@ -130,25 +125,16 @@ export function DashboardApp() {
     }
   }
 
-  function beginRename(group: SavedTabGroup) {
-    setEditingGroupId(group.id);
-    setGroupName(group.name);
-  }
-
-  const savedGroups = [...(snapshot?.savedTabGroups ?? [])].sort((left, right) => right.createdAt - left.createdAt);
-  const visibleGroupCount = savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).length;
+  const savedGroup = snapshot?.savedTabGroups[0] ?? { id: DEFAULT_SAVED_TAB_GROUP_ID, name: DEFAULT_SAVED_TAB_GROUP_NAME, createdAt: 0, tabs: [] };
+  const visibleSavedTabs = savedGroup.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
+  const hasSavedTabs = savedGroup.tabs.length > 0;
 
   function handleTabClick(windowId: number, tab: BrowserTab) {
     if (!tab.restorable) {
       void send({ type: 'focus-tab', tabId: tab.id });
       return;
     }
-    const groupId = savedGroups[0]?.id;
-    if (!groupId) {
-      setError('请先创建一个收纳组。');
-      return;
-    }
-    void send({ type: 'save-tabs', groupId, windowId, tabIds: [tab.id] });
+    void send({ type: 'save-tabs', groupId: savedGroup.id, windowId, tabIds: [tab.id] });
   }
 
   return (
@@ -160,7 +146,7 @@ export function DashboardApp() {
             <div><p className="m-0 font-semibold">LazyTabs</p><p className="m-0 text-xs text-muted">概览</p></div>
           </div>
           <div className="relative min-w-52 flex-1 sm:max-w-xl"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted" size={17} strokeWidth={1.8} /><Input aria-label="全局搜索" className="w-full pl-9" placeholder="搜索标题或 URL" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-          <Button isDisabled={!savedGroups.length} size="sm" variant="secondary" onPress={() => void send({ type: 'restore-all' })}><RotateCcw size={16} strokeWidth={1.8} />恢复全部</Button>
+          <Button isDisabled={!hasSavedTabs} size="sm" variant="secondary" onPress={() => void send({ type: 'restore-all' })}><RotateCcw size={16} strokeWidth={1.8} />恢复全部</Button>
         </div>
       </header>
 
@@ -211,21 +197,17 @@ export function DashboardApp() {
           </section>
 
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="saved-groups-heading">
-            <div><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">已收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${visibleGroupCount} 组可见` : '正在加载'}</p></div>
-            {snapshot && savedGroups.length === 0 && <EmptyState icon={<FolderArchive size={23} strokeWidth={1.7} />} title="还没有收纳组" description="收纳标签后，可在这里恢复或管理它们。" />}
-            {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
-              const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
-              const isEditing = editingGroupId === group.id;
-              return <div aria-label={`收纳组 ${group.name}`} className="min-w-0" key={group.id} role="region"><Card className="w-full min-w-0 overflow-hidden">
-                <Card.Header className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
-                  {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
-                </Card.Header>
-                <Card.Content className="pt-0"><div className="border-y border-default">
-                  {visibleTabs.map((tab) => <div className="tab-row flex items-center gap-2 py-2" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-0.5"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: group.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: group.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: group.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
-                </div></Card.Content>
-              </Card></div>;
-            })}
+            <div><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `默认收纳组 · ${savedGroup.tabs.length} 项` : '正在加载'}</p></div>
+            {snapshot && <div aria-label={`收纳组 ${savedGroup.name}`} className="min-w-0" role="region"><Card className="w-full min-w-0 overflow-hidden">
+              <Card.Header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-48 flex-1"><Card.Title>{savedGroup.name}</Card.Title><Card.Description>{savedGroup.tabs.length} 项 · 默认有效收纳组</Card.Description></div>
+                <Button isDisabled={!hasSavedTabs} isIconOnly aria-label="恢复默认收纳组" size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: savedGroup.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button>
+              </Card.Header>
+              <Card.Content className="pt-0"><div className="border-y border-default">
+                {!visibleSavedTabs.length && <p className="m-0 py-6 text-center text-sm text-muted">{hasSavedTabs ? '没有匹配的标签。' : '暂无标签，点击左侧网页即可加入。'}</p>}
+                {visibleSavedTabs.map((tab) => <div className="tab-row flex items-center gap-2 py-2" key={tab.id}><TabIcon favIconUrl={tab.favIconUrl} title={tab.title} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span><div className="flex gap-0.5"><Button isIconOnly aria-label={`恢复 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-tab', groupId: savedGroup.id, savedTabId: tab.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`打开 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id })}><ExternalLink size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${tab.title}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-tab', groupId: savedGroup.id, savedTabId: tab.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div></div>)}
+              </div></Card.Content>
+            </Card></div>}
           </section>
         </div>
       </div>

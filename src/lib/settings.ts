@@ -1,5 +1,5 @@
 import { GROUP_COLORS, MATCH_FIELDS, MATCH_OPERATORS, type Group, type GroupColor, type MatchCondition, type Rule } from './rules';
-import { isSavedTabGroups, type SavedTabGroup } from './saved-tabs';
+import { isSavedTabGroups, normalizeSavedTabGroups, type SavedTabGroup } from './saved-tabs';
 
 export type Settings = {
   enabled: boolean;
@@ -99,13 +99,14 @@ export async function getSettings(): Promise<Settings> {
     ...defaultSettings,
     ...settings,
     groups: currentGroups ?? (Array.isArray(groups) ? migrateLegacyGroups(groups as LegacyGroup[]) : Array.isArray(rules) ? rules.every(isCurrentRule) ? migrateCurrentRules(rules) : migrateLegacyRules(rules as LegacyRule[]) : []),
-    ...(savedTabGroups === undefined ? {} : { savedTabGroups: isSavedTabGroups(savedTabGroups) ? savedTabGroups : [] }),
+    ...(savedTabGroups === undefined ? {} : { savedTabGroups: isSavedTabGroups(savedTabGroups) ? normalizeSavedTabGroups(savedTabGroups) : normalizeSavedTabGroups() }),
     ...(retainRestoredGroups === undefined ? {} : { retainRestoredGroups: retainRestoredGroups === true }),
   };
 }
 
 export async function saveSettings(settings: Settings) {
-  await chrome.storage.local.set({ [settingsKey]: settings });
+  const nextSettings = settings.savedTabGroups === undefined ? settings : { ...settings, savedTabGroups: normalizeSavedTabGroups(settings.savedTabGroups) };
+  await chrome.storage.local.set({ [settingsKey]: nextSettings });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,5 +136,8 @@ export function parseImportedSettings(value: unknown): Settings | undefined {
       }
     }
   }
-  return value as Settings;
+  return {
+    ...value,
+    ...(value.savedTabGroups === undefined ? {} : { savedTabGroups: normalizeSavedTabGroups(value.savedTabGroups as SavedTabGroup[]) }),
+  } as Settings;
 }

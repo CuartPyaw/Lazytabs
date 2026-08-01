@@ -259,6 +259,17 @@ describe('background commands', () => {
     expect(tabsRemove).toHaveBeenCalledWith(42);
   });
 
+  it('creates one usable default group when no saved group exists', async () => {
+    getSettings.mockResolvedValue({ savedTabGroups: [] });
+    tabsGet.mockResolvedValue({ id: 42, windowId: 1, url: 'https://example.com/new', title: '新页', pinned: false, incognito: false } as chrome.tabs.Tab);
+
+    const snapshot = await sendMessage({ type: 'get-snapshot' });
+    expect(snapshot).toMatchObject({ savedTabGroups: [{ id: 'default-saved-group', name: '默认收纳组', tabs: [] }] });
+
+    const result = await sendMessage({ type: 'save-tabs', windowId: 1, tabIds: [42] });
+    expect(result).toMatchObject({ group: { id: 'default-saved-group', name: '默认收纳组', tabs: [{ title: '新页', url: 'https://example.com/new' }] } });
+  });
+
   it('restores and opens saved tabs in the focused normal window', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
     getSettings.mockResolvedValue({ savedTabGroups, retainRestoredGroups: true });

@@ -1,5 +1,5 @@
 import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
-import { appendSavedTabGroup, createSavedTabGroup, isRestorableTab, removeSavedTab, removeSavedTabGroup, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
+import { isRestorableTab, normalizeSavedTabGroups, removeSavedTab, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
 import { getSettings, saveSettings, type Settings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
@@ -44,6 +44,10 @@ function notifySnapshotChanged(reason: string) {
   void sendMessage({ type: 'snapshot-changed', reason }).catch(() => undefined);
 }
 
+function normalizeSettings(settings: Settings): Settings & { savedTabGroups: SavedTabGroup[] } {
+  return { ...settings, savedTabGroups: normalizeSavedTabGroups(settings.savedTabGroups) };
+}
+
 function serializeTab(tab: chrome.tabs.Tab, windowId: number) {
   return {
     id: tab.id ?? -1,
@@ -61,11 +65,12 @@ function serializeTab(tab: chrome.tabs.Tab, windowId: number) {
 }
 
 async function readSnapshot() {
-  const [settings, windows, groups] = await Promise.all([
+  const [rawSettings, windows, groups] = await Promise.all([
     getSettings(),
     chrome.windows.getAll({ populate: true }),
     chrome.tabGroups.query({}),
   ]);
+  const settings = normalizeSettings(rawSettings);
   const dashboardUrl = chrome.runtime.getURL('dashboard.html');
   const focusedWindow = windows.find((window) => window.focused === true && (!window.type || window.type === 'normal'));
 
@@ -148,18 +153,13 @@ async function saveTabs(tabIds: number[] | undefined, windowId: number | undefin
 
     if (!savedTabs.length) throw new Error('没有可收纳的网页标签。');
 
-    const settings = await getSettings();
-    const targetGroup = groupId ? settings.savedTabGroups?.find((item) => item.id === groupId) : undefined;
-    if (groupId && !targetGroup) throw new Error('找不到要收纳的收纳组。');
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
+    const targetGroup = settings.savedTabGroups[0];
+    if (groupId && groupId !== targetGroup.id) throw new Error('只能使用默认收纳组。');
 
-    const windowIds = new Set(tabs.filter((tab) => savedTabs.some((item) => item.sourceTabId === tab.id)).map((tab) => tab.windowId).filter((id): id is number => id !== undefined));
-    const windowLabel = windowIds.size === 1 ? `窗口 ${[...windowIds][0]}` : '多个窗口';
-    const group = targetGroup
-      ? { ...targetGroup, tabs: [...targetGroup.tabs, ...savedTabs.map((item) => item.tab)] }
-      : createSavedTabGroup(savedTabs.map((item) => item.tab), windowLabel);
-    const nextSettings = targetGroup
-      ? { ...settings, savedTabGroups: (settings.savedTabGroups ?? []).map((item) => item.id === targetGroup.id ? group : item) }
-      : appendSavedTabGroup(settings, group);
+    const group = { ...targetGroup, tabs: [...targetGroup.tabs, ...savedTabs.map((item) => item.tab)] };
+    const nextSettings = { ...settings, savedTabGroups: [group] };
 
     // Persist before closing tabs so a browser API failure cannot lose the records.
     await saveSettings(nextSettings);
@@ -208,7 +208,8 @@ async function restoreGroup(settings: Settings, group: SavedTabGroup, windowId: 
 
 async function restoreSavedTab(groupId: string, savedTabId: string) {
   return withSavedTabsLock(async () => {
-    const settings = await getSettings();
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
     const group = settings.savedTabGroups?.find((item) => item.id === groupId);
     const savedTab = group?.tabs.find((item) => item.id === savedTabId);
     if (!group || !savedTab) throw new Error('找不到要恢复的收纳记录。');
@@ -225,7 +226,8 @@ async function restoreSavedTab(groupId: string, savedTabId: string) {
 
 async function restoreSavedGroup(groupId: string) {
   return withSavedTabsLock(async () => {
-    const settings = await getSettings();
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
     const group = settings.savedTabGroups?.find((item) => item.id === groupId);
     if (!group) throw new Error('找不到要恢复的收纳组。');
 
@@ -233,9 +235,7 @@ async function restoreSavedGroup(groupId: string) {
     const result = await restoreGroup(settings, group, windowId);
     const keep = settings.retainRestoredGroups === true;
     if (!keep && result.failedSavedTabIds.length < group.tabs.length) {
-      const savedTabGroups = result.remainingTabs.length
-        ? (settings.savedTabGroups ?? []).map((item) => item.id === groupId ? { ...item, tabs: result.remainingTabs } : item)
-        : (settings.savedTabGroups ?? []).filter((item) => item.id !== groupId);
+      const savedTabGroups = settings.savedTabGroups.map((item) => item.id === groupId ? { ...item, tabs: result.remainingTabs } : item);
       await saveSettings({ ...settings, savedTabGroups });
       notifySnapshotChanged('restored-group');
     }
@@ -247,8 +247,9 @@ async function restoreSavedGroup(groupId: string) {
 
 async function restoreAllSavedGroups() {
   return withSavedTabsLock(async () => {
-    const settings = await getSettings();
-    const groups = settings.savedTabGroups ?? [];
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
+    const groups = settings.savedTabGroups;
     const windowId = await currentWindowId();
     const keep = settings.retainRestoredGroups === true;
     const remainingGroups: SavedTabGroup[] = [];
@@ -261,7 +262,7 @@ async function restoreAllSavedGroups() {
       restoredTabIds.push(...result.restoredTabIds);
       failedSavedTabIds.push(...result.failedSavedTabIds);
       errors.push(...result.errors);
-      if (keep || result.remainingTabs.length) remainingGroups.push(keep ? group : { ...group, tabs: result.remainingTabs });
+      remainingGroups.push(keep ? group : { ...group, tabs: result.remainingTabs });
     }
 
     if (!keep) {
@@ -274,18 +275,13 @@ async function restoreAllSavedGroups() {
 }
 
 async function deleteSavedGroup(groupId: string) {
-  return withSavedTabsLock(async () => {
-    const settings = await getSettings();
-    if (!(settings.savedTabGroups ?? []).some((group) => group.id === groupId)) return { groupId, deleted: false };
-    await saveSettings(removeSavedTabGroup(settings, groupId));
-    notifySnapshotChanged('deleted-group');
-    return { groupId, deleted: true };
-  });
+  throw new Error('默认收纳组不能删除。');
 }
 
 async function deleteSavedTab(groupId: string, savedTabId: string) {
   return withSavedTabsLock(async () => {
-    const settings = await getSettings();
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
     const group = settings.savedTabGroups?.find((item) => item.id === groupId);
     if (!group?.tabs.some((tab) => tab.id === savedTabId)) return { groupId, savedTabId, deleted: false };
     await saveSettings(removeSavedTab(settings, groupId, savedTabId));
@@ -295,18 +291,7 @@ async function deleteSavedTab(groupId: string, savedTabId: string) {
 }
 
 async function renameSavedGroup(groupId: string, name: string) {
-  return withSavedTabsLock(async () => {
-    const nextName = name.trim();
-    if (!nextName) throw new Error('收纳组名称不能为空。');
-    const settings = await getSettings();
-    const groups = settings.savedTabGroups ?? [];
-    const group = groups.find((item) => item.id === groupId);
-    if (!group) throw new Error('找不到要重命名的收纳组。');
-    if (groups.some((item) => item.id !== groupId && item.name === nextName)) throw new Error('收纳组名称已存在。');
-    await saveSettings({ ...settings, savedTabGroups: groups.map((item) => item.id === groupId ? { ...item, name: nextName } : item) });
-    notifySnapshotChanged('renamed-group');
-    return { groupId, name: nextName };
-  });
+  throw new Error('默认收纳组不能重命名。');
 }
 
 async function focusTab(tabId: number) {
@@ -321,7 +306,8 @@ async function openTab(message: BackgroundMessage) {
   let url: string | undefined;
   if (typeof message.url === 'string') url = message.url;
   if (typeof message.groupId === 'string' && typeof message.savedTabId === 'string') {
-    const settings = await getSettings();
+    const rawSettings = await getSettings();
+    const settings = normalizeSettings(rawSettings);
     url = settings.savedTabGroups?.find((group) => group.id === message.groupId)?.tabs.find((tab) => tab.id === message.savedTabId)?.url;
   }
   if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');

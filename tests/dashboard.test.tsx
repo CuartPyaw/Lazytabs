@@ -117,7 +117,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
 
     const currentTabs = screen.getByRole('region', { name: '当前标签' });
-    const savedGroups = screen.getByRole('region', { name: '已收纳组' });
+    const savedGroups = screen.getByRole('region', { name: '收纳组' });
     expect(currentTabs.classList.contains('flex')).toBe(true);
     expect(currentTabs.classList.contains('min-w-0')).toBe(true);
     expect(savedGroups.classList.contains('flex')).toBe(true);
@@ -146,15 +146,15 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
   });
 
-  it('does not create a group when a webpage is clicked without an existing group', async () => {
+  it('shows and uses the default group when no saved tabs exist yet', async () => {
     activeSnapshot = { ...snapshot, savedTabGroups: [] };
     render(<DashboardApp />);
 
     const tabButton = (await screen.findByText('GitHub')).closest('button');
     expect(tabButton).toBeTruthy();
     fireEvent.click(tabButton!);
-    expect(await screen.findByText('请先创建一个收纳组。')).toBeTruthy();
-    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'save-tabs' }));
+    expect(screen.getByText('默认收纳组')).toBeTruthy();
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'default-saved-group', windowId: 1, tabIds: [10] }));
   });
 
   it('saves all restorable tabs in a browser group', async () => {
@@ -169,7 +169,7 @@ describe('DashboardApp', () => {
     sendMessage.mockImplementation(async (message: { type: string }) => message.type === 'restore-group' ? { error: '无法恢复' } : snapshot);
     render(<DashboardApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '恢复 窗口 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: '恢复默认收纳组' }));
 
     expect(await screen.findByText('无法恢复')).toBeTruthy();
   });
