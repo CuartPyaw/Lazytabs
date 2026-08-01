@@ -1,6 +1,6 @@
 import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
 import { Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
-import { type DragEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
 
@@ -49,8 +49,6 @@ type Snapshot = {
   settings: { retainRestoredGroups: boolean };
 };
 
-type DraggedTab = { windowId: number; tabId: number };
-
 const groupColorClasses: Record<string, string> = {
   grey: 'bg-gray-400',
   blue: 'bg-blue-400',
@@ -80,8 +78,6 @@ function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) 
 export function DashboardApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [search, setSearch] = useState('');
-  const draggedTabRef = useRef<DraggedTab | undefined>(undefined);
-  const [dropGroupId, setDropGroupId] = useState<string>();
   const [editingGroupId, setEditingGroupId] = useState<string>();
   const [groupName, setGroupName] = useState('');
   const [error, setError] = useState<string>();
@@ -142,23 +138,17 @@ export function DashboardApp() {
   const savedGroups = [...(snapshot?.savedTabGroups ?? [])].sort((left, right) => right.createdAt - left.createdAt);
   const visibleGroupCount = savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).length;
 
-  function beginTabDrag(event: DragEvent<HTMLButtonElement>, windowId: number, tab: BrowserTab) {
+  function handleTabClick(windowId: number, tab: BrowserTab) {
     if (!tab.restorable) {
-      event.preventDefault();
+      void send({ type: 'focus-tab', tabId: tab.id });
       return;
     }
-    draggedTabRef.current = { windowId, tabId: tab.id };
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', String(tab.id));
-  }
-
-  function dropDraggedTab(event: DragEvent<HTMLDivElement>, groupId: string) {
-    const tab = draggedTabRef.current;
-    if (!tab) return;
-    event.preventDefault();
-    setDropGroupId(undefined);
-    draggedTabRef.current = undefined;
-    void send({ type: 'save-tabs', groupId, windowId: tab.windowId, tabIds: [tab.tabId] });
+    const groupId = savedGroups[0]?.id;
+    if (!groupId) {
+      setError('请先创建一个收纳组。');
+      return;
+    }
+    void send({ type: 'save-tabs', groupId, windowId, tabIds: [tab.id] });
   }
 
   return (
@@ -184,7 +174,7 @@ export function DashboardApp() {
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
               const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
-                <button className={`flex min-w-0 flex-1 select-none items-center gap-2 text-left ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`} draggable={tab.restorable} title={tab.restorable ? '拖动到已有收纳组' : undefined} type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })} onDragEnd={() => { draggedTabRef.current = undefined; setDropGroupId(undefined); }} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
+                <button className="flex min-w-0 flex-1 cursor-pointer select-none items-center gap-2 text-left" title={tab.restorable ? '点击自动收纳到最近的收纳组' : undefined} type="button" onClick={() => handleTabClick(window.id, tab)}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
                 </button>
@@ -226,7 +216,7 @@ export function DashboardApp() {
             {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
               const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const isEditing = editingGroupId === group.id;
-              return <div aria-label={`收纳组 ${group.name}`} className="min-w-0" key={group.id} role="region" onDragOver={(event) => { if (!draggedTabRef.current) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropGroupId(group.id); }} onDrop={(event) => dropDraggedTab(event, group.id)}><Card className={`w-full min-w-0 overflow-hidden ${dropGroupId === group.id ? 'ring-2 ring-primary' : ''}`}>
+              return <div aria-label={`收纳组 ${group.name}`} className="min-w-0" key={group.id} role="region"><Card className="w-full min-w-0 overflow-hidden">
                 <Card.Header className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
                   {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}
