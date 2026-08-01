@@ -76,7 +76,7 @@ function formatDate(timestamp: number) {
 
 function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) {
   if (!favIconUrl) return <span className="tab-icon grid size-6 shrink-0 place-items-center rounded-md bg-default text-muted"><Globe2 size={14} strokeWidth={1.8} /></span>;
-  return <img alt="" className="tab-icon size-6 shrink-0 rounded-md bg-default object-contain" src={favIconUrl} title={title} />;
+  return <img alt="" className="tab-icon size-6 shrink-0 rounded-md bg-default object-contain" draggable={false} src={favIconUrl} title={title} />;
 }
 
 export function DashboardApp() {
@@ -175,7 +175,7 @@ export function DashboardApp() {
   function dropDraggedTab(event: DragEvent<HTMLDivElement>, groupId: string) {
     event.preventDefault();
     setDropGroupId(undefined);
-    const tab = readDraggedTab(event);
+    const tab = draggedTabRef.current ?? readDraggedTab(event);
     draggedTabRef.current = undefined;
     if (tab) void send({ type: 'save-tabs', groupId, windowId: tab.windowId, tabIds: [tab.tabId] });
   }
@@ -203,7 +203,7 @@ export function DashboardApp() {
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
               const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
-                <button className={`flex min-w-0 flex-1 items-center gap-2 text-left ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`} draggable={tab.restorable} title={tab.restorable ? '长按拖动到收纳组' : undefined} type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })} onDragEnd={() => { draggedTabRef.current = undefined; setDropGroupId(undefined); }} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
+                <button className={`flex min-w-0 flex-1 items-center gap-2 text-left ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`} draggable={tab.restorable} title={tab.restorable ? '长按拖动到收纳组' : undefined} type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })} onDragEnd={() => setDropGroupId(undefined)} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
                 </button>
@@ -245,7 +245,7 @@ export function DashboardApp() {
             {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
               const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const isEditing = editingGroupId === group.id;
-              return <div aria-label={`收纳组 ${group.name}`} className="min-w-0" key={group.id} role="region" onDragEnter={() => setDropGroupId(group.id)} onDragLeave={() => setDropGroupId(undefined)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropGroupId(group.id); }} onDrop={(event) => dropDraggedTab(event, group.id)}><Card className={`w-full min-w-0 overflow-hidden ${dropGroupId === group.id ? 'ring-2 ring-primary' : ''}`}>
+              return <div aria-label={`收纳组 ${group.name}`} className="min-w-0" key={group.id} role="region"><Card className={`w-full min-w-0 overflow-hidden ${dropGroupId === group.id ? 'ring-2 ring-primary' : ''}`} onDragOver={(event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'; setDropGroupId(group.id); }} onDrop={(event) => dropDraggedTab(event, group.id)}>
                 <Card.Header className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-48 flex-1">{isEditing ? <div className="flex gap-2"><Input aria-label="收纳组名称" value={groupName} onChange={(event) => setGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined)); }} /><Button isIconOnly aria-label="确认重命名" size="sm" onPress={() => void send({ type: 'rename-group', groupId: group.id, name: groupName }, () => setEditingGroupId(undefined))}><Check size={16} /></Button><Button isIconOnly aria-label="取消重命名" size="sm" variant="tertiary" onPress={() => setEditingGroupId(undefined)}><X size={16} /></Button></div> : <><Card.Title>{group.name}</Card.Title><Card.Description>{group.tabs.length} 项 · {formatDate(group.createdAt)}</Card.Description></>}</div>
                   {!isEditing && <div className="flex gap-1"><Button isIconOnly aria-label={`重命名 ${group.name}`} size="sm" variant="tertiary" onPress={() => beginRename(group)}><Pencil size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button><Button isIconOnly aria-label={`删除 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'delete-group', groupId: group.id })}><Trash2 size={16} strokeWidth={1.8} /></Button></div>}

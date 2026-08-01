@@ -105,9 +105,10 @@ describe('DashboardApp', () => {
     const tabButton = screen.getByText('GitLab').closest('button');
     expect(tabButton).toBeTruthy();
     fireEvent.dragStart(tabButton!);
-    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' });
-    fireEvent.dragOver(savedGroup);
-    fireEvent.drop(savedGroup);
+    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
+    expect(savedGroup).toBeTruthy();
+    fireEvent.dragOver(savedGroup!);
+    fireEvent.drop(savedGroup!);
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 2, tabIds: [20] }));
   });
 
@@ -163,13 +164,32 @@ describe('DashboardApp', () => {
     fireEvent.dragStart(tabButton!, { dataTransfer });
     fireEvent.dragEnd(tabButton!);
     expect(screen.queryByText('收纳框')).toBeNull();
-    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' });
-    fireEvent.dragOver(savedGroup, { dataTransfer });
-    fireEvent.drop(savedGroup, { dataTransfer });
+    const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
+    expect(savedGroup).toBeTruthy();
+    fireEvent.dragOver(savedGroup!, { dataTransfer });
+    fireEvent.drop(savedGroup!, { dataTransfer });
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
     expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
+  });
+
+  it('keeps the dragged tab available when the drop lands on the saved group card', async () => {
+    render(<DashboardApp />);
+
+    const tabButton = (await screen.findByText('GitHub')).closest('button');
+    const savedGroupCard = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
+    const dataTransfer = dragData();
+    const emptyDropData = dragData();
+    expect(tabButton).toBeTruthy();
+    expect(savedGroupCard).toBeTruthy();
+
+    fireEvent.dragStart(tabButton!, { dataTransfer });
+    fireEvent.dragEnd(tabButton!);
+    fireEvent.dragOver(savedGroupCard!, { dataTransfer: emptyDropData });
+    fireEvent.drop(savedGroupCard!, { dataTransfer: emptyDropData });
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
   });
 
   it('saves all restorable tabs in a browser group', async () => {
