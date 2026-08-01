@@ -75,15 +75,12 @@ describe('DashboardApp', () => {
     expect(screen.getByText('工作').previousElementSibling?.className).toContain('bg-blue-400');
   });
 
-  it('renders only the focused window and clears selection after focus changes', async () => {
+  it('renders only the focused window and archives a dragged tab', async () => {
     activeSnapshot = { ...snapshot, windows: [...snapshot.windows, secondWindow] };
     render(<DashboardApp />);
 
     expect(await screen.findByText('GitHub')).toBeTruthy();
     expect(screen.queryByText('GitLab')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: '选择 GitHub' }));
-    expect(screen.getByRole('button', { name: '收纳选中 (1)' })).toBeTruthy();
 
     activeSnapshot = {
       ...activeSnapshot,
@@ -94,12 +91,23 @@ describe('DashboardApp', () => {
     await waitFor(() => {
       expect(screen.getByText('GitLab')).toBeTruthy();
       expect(screen.queryByText('GitHub')).toBeNull();
-      expect(screen.queryByRole('button', { name: '收纳选中 (1)' })).toBeNull();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '选择 GitLab' }));
-    fireEvent.click(await screen.findByRole('button', { name: '收纳选中 (1)' }));
+    const tabRow = screen.getByText('GitLab').closest('.tab-row');
+    expect(tabRow).toBeTruthy();
+    fireEvent.dragStart(tabRow!);
+    fireEvent.drop(screen.getByRole('region', { name: '收纳框' }));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 2, tabIds: [20] }));
+  });
+
+  it('removes selection actions and keeps fixed tabs out of drag archiving', async () => {
+    render(<DashboardApp />);
+
+    expect(await screen.findByText('GitHub')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /收纳选中/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '关闭选中' })).toBeNull();
+    expect(screen.getByText('GitHub').closest('.tab-row')?.getAttribute('draggable')).toBe('true');
+    expect(screen.getByText('固定页').closest('.tab-row')?.getAttribute('draggable')).toBe('false');
   });
 
   it('keeps dashboard columns and cards within their grid tracks', async () => {
@@ -135,14 +143,16 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
   });
 
-  it('saves selected restorable tabs while allowing fixed tabs to be selected for closing', async () => {
+  it('saves a dragged restorable tab while leaving fixed tabs undraggable', async () => {
     render(<DashboardApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '选择 GitHub' }));
-    fireEvent.click(screen.getByRole('button', { name: '收纳选中 (1)' }));
+    const tabRow = (await screen.findByText('GitHub')).closest('.tab-row');
+    expect(tabRow).toBeTruthy();
+    fireEvent.dragStart(tabRow!);
+    fireEvent.drop(screen.getByRole('region', { name: '收纳框' }));
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, tabIds: [10] }));
-    expect(screen.getByRole('button', { name: '选择 固定页' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByText('固定页').closest('.tab-row')?.getAttribute('draggable')).toBe('false');
     expect(screen.getByText('固定标签，无法收纳')).toBeTruthy();
   });
 
@@ -152,16 +162,6 @@ describe('DashboardApp', () => {
     fireEvent.click(await screen.findByRole('button', { name: '收纳分组 工作' }));
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, tabIds: [10] }));
-  });
-
-  it('confirms before closing selected tabs', async () => {
-    render(<DashboardApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '选择 GitHub' }));
-    fireEvent.click(screen.getByRole('button', { name: '关闭选中' }));
-    fireEvent.click(await screen.findByRole('button', { name: '确认关闭' }));
-
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'close-tabs', tabIds: [10] }));
   });
 
   it('shows background message errors', async () => {

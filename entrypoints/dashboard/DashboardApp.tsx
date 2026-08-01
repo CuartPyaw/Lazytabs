@@ -1,6 +1,6 @@
-import { Button, Card, Input, Modal, Skeleton, useTheme } from '@heroui/react';
-import { Archive, Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Button, Card, Input, Skeleton, useTheme } from '@heroui/react';
+import { Check, CircleAlert, ExternalLink, FolderArchive, Globe2, Layers3, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { type DragEvent, useEffect, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
 
@@ -49,7 +49,7 @@ type Snapshot = {
   settings: { retainRestoredGroups: boolean };
 };
 
-type PendingClose = { windowId: number; tabIds: number[] };
+type DraggedTab = { windowId: number; tabId: number };
 
 const groupColorClasses: Record<string, string> = {
   grey: 'bg-gray-400',
@@ -80,8 +80,8 @@ function TabIcon({ favIconUrl, title }: { favIconUrl?: string; title: string }) 
 export function DashboardApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [search, setSearch] = useState('');
-  const [selectedTabs, setSelectedTabs] = useState<Record<number, number[]>>({});
-  const [pendingClose, setPendingClose] = useState<PendingClose>();
+  const [draggedTab, setDraggedTab] = useState<DraggedTab>();
+  const [archiveDropActive, setArchiveDropActive] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string>();
   const [groupName, setGroupName] = useState('');
   const [error, setError] = useState<string>();
@@ -122,10 +122,6 @@ export function DashboardApp() {
   const currentWindow = snapshot?.windows.find((window) => window.focused);
   const currentWindows = currentWindow ? [currentWindow] : [];
 
-  useEffect(() => {
-    setSelectedTabs({});
-  }, [currentWindow?.id]);
-
   async function send(message: Record<string, unknown>, afterSuccess?: () => void) {
     try {
       const response = await chrome.runtime.sendMessage(message) as { error?: unknown };
@@ -138,13 +134,6 @@ export function DashboardApp() {
     }
   }
 
-  function toggleTab(windowId: number, tabId: number) {
-    setSelectedTabs((current) => {
-      const selected = current[windowId] ?? [];
-      return { ...current, [windowId]: selected.includes(tabId) ? selected.filter((id) => id !== tabId) : [...selected, tabId] };
-    });
-  }
-
   function beginRename(group: SavedTabGroup) {
     setEditingGroupId(group.id);
     setGroupName(group.name);
@@ -152,6 +141,26 @@ export function DashboardApp() {
 
   const savedGroups = [...(snapshot?.savedTabGroups ?? [])].sort((left, right) => right.createdAt - left.createdAt);
   const visibleGroupCount = savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).length;
+
+  function beginTabDrag(event: DragEvent<HTMLDivElement>, windowId: number, tab: BrowserTab) {
+    if (!tab.restorable) {
+      event.preventDefault();
+      return;
+    }
+    setDraggedTab({ windowId, tabId: tab.id });
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(tab.id));
+    }
+  }
+
+  function archiveDraggedTab(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setArchiveDropActive(false);
+    const tab = draggedTab;
+    setDraggedTab(undefined);
+    if (tab) void send({ type: 'save-tabs', windowId: tab.windowId, tabIds: [tab.tabId] });
+  }
 
   return (
     <main className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -173,11 +182,9 @@ export function DashboardApp() {
             {!snapshot && <><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></>}
             {snapshot && currentWindows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
             {currentWindows.map((window, index) => {
-              const selected = selectedTabs[window.id] ?? [];
               const visibleTabs = window.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
               const restorableCount = window.tabs.filter((tab) => tab.restorable).length;
-              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''}`} key={tab.id}>
-                <Button isIconOnly aria-label={`选择 ${tab.title}`} size="sm" variant={selected.includes(tab.id) ? 'primary' : 'tertiary'} onPress={() => toggleTab(window.id, tab.id)}><Check className={selected.includes(tab.id) ? '' : 'opacity-0'} size={16} strokeWidth={2.4} /></Button>
+              const renderTab = (tab: BrowserTab) => <div className={`tab-row flex items-center gap-2 py-2 ${tab.active ? 'bg-primary/5' : ''} ${tab.restorable ? 'cursor-grab active:cursor-grabbing' : ''}`} draggable={tab.restorable} key={tab.id} title={tab.restorable ? '长按拖动到收纳框' : undefined} onDragEnd={() => { setDraggedTab(undefined); setArchiveDropActive(false); }} onDragStart={(event) => beginTabDrag(event, window.id, tab)}>
                 <button className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left" type="button" onClick={() => void send({ type: 'focus-tab', tabId: tab.id })}>
                   <TabIcon favIconUrl={tab.favIconUrl} title={tab.title} />
                   <span className="min-w-0"><span className="block truncate text-sm font-medium">{tab.title || '未命名标签'}</span><span className="block truncate text-xs text-muted">{tab.url}</span></span>
@@ -193,8 +200,7 @@ export function DashboardApp() {
               return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
                 <Card.Header className="relative flex flex-col items-stretch gap-3">
                   <div className="pr-10"><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签</Card.Description></div>
-                  <Button className="absolute right-4 top-4" isDisabled={!restorableCount} isIconOnly aria-label="收纳窗口" size="sm" variant="tertiary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><FolderArchive size={17} strokeWidth={1.8} /></Button>
-                  {selected.length > 0 && <div className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: selected }, () => setSelectedTabs((current) => ({ ...current, [window.id]: [] })))}><Archive size={15} strokeWidth={1.8} />收纳选中 ({selected.length})</Button><Button size="sm" variant="danger" onPress={() => setPendingClose({ windowId: window.id, tabIds: selected })}><Trash2 size={15} strokeWidth={1.8} />关闭选中</Button></div>}
+                  <Button className="absolute right-4 top-4" isDisabled={!restorableCount} isIconOnly aria-label="收纳窗口" size="sm" variant="tertiary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id })}><FolderArchive size={17} strokeWidth={1.8} /></Button>
                 </Card.Header>
                 <Card.Content className="pt-0">
                   {!visibleTabs.length && <p className="m-0 py-4 text-sm text-muted">没有匹配的标签。</p>}
@@ -204,7 +210,7 @@ export function DashboardApp() {
                         <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${groupColorClasses[group.color] ?? 'bg-default-500'}`} />
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{group.title || '未命名分组'}</span>
                         <span className="text-xs text-muted">{tabs.length} 个标签</span>
-                        <Button isDisabled={!restorableTabIds.length} isIconOnly aria-label={`收纳分组 ${group.title || '未命名分组'}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: restorableTabIds }, () => setSelectedTabs((current) => ({ ...current, [window.id]: (current[window.id] ?? []).filter((tabId) => !restorableTabIds.includes(tabId)) })))}><FolderArchive size={16} strokeWidth={1.8} /></Button>
+                        <Button isDisabled={!restorableTabIds.length} isIconOnly aria-label={`收纳分组 ${group.title || '未命名分组'}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'save-tabs', windowId: window.id, tabIds: restorableTabIds })}><FolderArchive size={16} strokeWidth={1.8} /></Button>
                       </div>
                       <div className="px-3">{tabs.map(renderTab)}</div>
                     </div>)}
@@ -217,6 +223,10 @@ export function DashboardApp() {
 
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="saved-groups-heading">
             <div><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">已收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${visibleGroupCount} 组可见` : '正在加载'}</p></div>
+            <div aria-label="收纳框" className={`flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 transition-colors ${archiveDropActive ? 'border-primary bg-primary/10' : 'border-default bg-default/20'}`} role="region" onDragEnter={() => setArchiveDropActive(true)} onDragLeave={() => setArchiveDropActive(false)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setArchiveDropActive(true); }} onDrop={archiveDraggedTab}>
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-default text-muted"><FolderArchive size={19} strokeWidth={1.8} /></span>
+              <div><p className="m-0 text-sm font-semibold">收纳框</p><p className="m-0 mt-1 text-xs text-muted">长按标签页拖到这里收纳</p></div>
+            </div>
             {snapshot && savedGroups.length === 0 && <EmptyState icon={<FolderArchive size={23} strokeWidth={1.7} />} title="还没有收纳组" description="收纳标签后，可在这里恢复或管理它们。" />}
             {snapshot && savedGroups.filter((group) => group.tabs.some((tab) => matchesSearch(search, tab.title, tab.url))).map((group) => {
               const visibleTabs = group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
@@ -237,17 +247,6 @@ export function DashboardApp() {
 
       {error && <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger shadow-lg"><CircleAlert size={18} strokeWidth={2} /><span className="flex-1">{error}</span><Button isIconOnly aria-label="关闭错误提示" size="sm" variant="tertiary" onPress={() => setError(undefined)}><X size={16} /></Button></div>}
 
-      <Modal isOpen={Boolean(pendingClose)} onOpenChange={(isOpen) => { if (!isOpen) setPendingClose(undefined); }}>
-        <Modal.Backdrop className="group-editor-backdrop">
-          <Modal.Container className="group-editor-container" placement="center" size="sm">
-            <Modal.Dialog className="w-full rounded-lg p-0">
-              <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>关闭选中标签</Modal.Heading></Modal.Header>
-              <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">确定要关闭选中的 {pendingClose?.tabIds.length ?? 0} 个标签吗？此操作无法撤销。</Modal.Body>
-              <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setPendingClose(undefined)}>取消</Button><Button variant="danger" onPress={() => { if (!pendingClose) return; const { windowId, tabIds } = pendingClose; setPendingClose(undefined); void send({ type: 'close-tabs', tabIds }, () => setSelectedTabs((current) => ({ ...current, [windowId]: [] }))); }}><Trash2 size={16} strokeWidth={1.8} />确认关闭</Button></Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
     </main>
   );
 }
