@@ -95,11 +95,11 @@ describe('DashboardApp', () => {
 
     const tabButton = screen.getByText('GitLab').closest('button');
     expect(tabButton).toBeTruthy();
-    fireEvent.pointerDown(tabButton!, { button: 0 });
+    fireEvent.dragStart(tabButton!, { dataTransfer: { setData: vi.fn(), setDragImage: vi.fn() } });
     const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
     expect(savedGroup).toBeTruthy();
-    fireEvent.pointerEnter(savedGroup!);
-    fireEvent.pointerUp(savedGroup!);
+    fireEvent.dragOver(savedGroup!, { dataTransfer: { dropEffect: 'move' } });
+    fireEvent.drop(savedGroup!, { dataTransfer: { getData: vi.fn() } });
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 2, tabIds: [20] }));
   });
 
@@ -110,14 +110,14 @@ describe('DashboardApp', () => {
     expect(screen.queryByRole('button', { name: /收纳选中/ })).toBeNull();
     expect(screen.queryByRole('button', { name: '关闭选中' })).toBeNull();
     expect(screen.getByText('GitHub').closest('button')?.className).toContain('cursor-grab');
-    expect(screen.getByText('GitHub').closest('button')?.getAttribute('draggable')).toBe('false');
+    expect(screen.getByText('GitHub').closest('button')?.getAttribute('draggable')).toBe('true');
     const fixedTabButton = screen.getByText('固定页').closest('button');
     const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
     expect(fixedTabButton?.getAttribute('draggable')).toBe('false');
     expect(savedGroup).toBeTruthy();
-    fireEvent.pointerDown(fixedTabButton!, { button: 0 });
-    fireEvent.pointerEnter(savedGroup!);
-    fireEvent.pointerUp(savedGroup!);
+    fireEvent.dragStart(fixedTabButton!, { dataTransfer: { setData: vi.fn(), setDragImage: vi.fn() } });
+    fireEvent.dragOver(savedGroup!, { dataTransfer: { dropEffect: 'move' } });
+    fireEvent.drop(savedGroup!, { dataTransfer: { getData: vi.fn() } });
     expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'save-tabs' }));
   });
 
@@ -159,12 +159,12 @@ describe('DashboardApp', () => {
 
     const tabButton = (await screen.findByText('GitHub')).closest('button');
     expect(tabButton).toBeTruthy();
-    fireEvent.pointerDown(tabButton!, { button: 0 });
+    fireEvent.dragStart(tabButton!, { dataTransfer: { setData: vi.fn(), setDragImage: vi.fn() } });
     expect(screen.queryByText('收纳框')).toBeNull();
     const savedGroup = screen.getByRole('region', { name: '收纳组 窗口 1' }).querySelector('[data-slot="card"]');
     expect(savedGroup).toBeTruthy();
-    fireEvent.pointerEnter(savedGroup!);
-    fireEvent.pointerUp(savedGroup!);
+    fireEvent.dragOver(savedGroup!, { dataTransfer: { dropEffect: 'move' } });
+    fireEvent.drop(savedGroup!, { dataTransfer: { getData: vi.fn() } });
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
     expect(screen.getByText('固定页').closest('button')?.getAttribute('draggable')).toBe('false');
@@ -179,9 +179,9 @@ describe('DashboardApp', () => {
     expect(tabButton).toBeTruthy();
     expect(savedGroupCard).toBeTruthy();
 
-    fireEvent.pointerDown(tabButton!, { button: 0 });
-    fireEvent.pointerEnter(savedGroupCard!);
-    fireEvent.pointerUp(savedGroupCard!);
+    fireEvent.dragStart(tabButton!, { dataTransfer: { setData: vi.fn(), setDragImage: vi.fn() } });
+    fireEvent.dragOver(savedGroupCard!, { dataTransfer: { dropEffect: 'move' } });
+    fireEvent.drop(savedGroupCard!, { dataTransfer: { getData: vi.fn() } });
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'group-1', windowId: 1, tabIds: [10] }));
   });
