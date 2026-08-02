@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OptionsApp } from '../entrypoints/options/OptionsApp';
-import { todayDayKey } from '../src/lib/saved-tabs';
 
 const storedSettings = {
   enabled: true,
@@ -50,12 +49,6 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
     fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
-  });
-
-  it('does not offer keeping restored groups', async () => {
-    render(<OptionsApp />);
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    expect(screen.queryByRole('switch', { name: '恢复后保留收纳记录' })).toBeNull();
   });
 
   it('opens a group editor with nested matching rules', async () => {
@@ -108,47 +101,6 @@ describe('OptionsApp interactions', () => {
     expect(storageSet).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: importedSettings }));
-  });
-
-  it('keeps saved tabs separate when importing settings', async () => {
-    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
-    storageGet.mockResolvedValue({ settings: { ...storedSettings, savedTabGroups } });
-    const importedSettings = { ...storedSettings, theme: 'dark' as const, groups: [] };
-    render(<OptionsApp />);
-    fireEvent.click(await screen.findByRole('button', { name: '数据' }));
-    fireEvent.change(document.querySelector('input[accept=".json,application/json"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
-    fireEvent.click(await screen.findByRole('button', { name: '确认导入' }));
-
-    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
-      settings: {
-        ...importedSettings,
-        savedTabGroups: [{
-          id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [],
-          groups: [{ id: expect.any(String), name: todayDayKey(), createdAt: expect.any(Number), kind: 'day', tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }],
-        }],
-      },
-    }));
-  });
-
-  it('imports dated saved tab lines into day groups and reports skipped lines', async () => {
-    render(<OptionsApp />);
-    fireEvent.click(await screen.findByRole('button', { name: '数据' }));
-    fireEvent.change(document.querySelector('input[accept=".txt,text/plain"]')!, { target: { files: [new File(['2026-08-01 | https://example.com/one | Example\nnot-a-url\nhttps://example.com/two | Example'], 'lazytabs.txt', { type: 'text/plain' })] } });
-
-    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
-      settings: {
-        ...storedSettings,
-        savedTabGroups: [{
-          id: 'default-saved-group', name: '默认收纳组', createdAt: 0,
-          tabs: [],
-          groups: [
-            { id: expect.any(String), name: todayDayKey(), createdAt: expect.any(Number), kind: 'day', tabs: [{ id: expect.any(String), title: 'Example', url: 'https://example.com/two' }] },
-            { id: expect.any(String), name: '2026-08-01', createdAt: expect.any(Number), kind: 'day', tabs: [{ id: expect.any(String), title: 'Example', url: 'https://example.com/one' }] },
-          ],
-        }],
-      },
-    }));
-    expect(await screen.findByText('已导入 2 条 URL，跳过 1 条。')).toBeTruthy();
   });
 
   it('shows a newer GitHub release', async () => {

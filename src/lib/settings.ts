@@ -1,5 +1,4 @@
 import { GROUP_COLORS, MATCH_FIELDS, MATCH_OPERATORS, type Group, type GroupColor, type MatchCondition, type Rule } from './rules';
-import { isSavedTabGroups, normalizeSavedTabGroups, type SavedTabGroup } from './saved-tabs';
 
 export type Settings = {
   enabled: boolean;
@@ -7,10 +6,7 @@ export type Settings = {
   organizeAllWindows: boolean;
   groups: Group[];
   theme: Theme;
-  savedTabGroups?: SavedTabGroup[];
 };
-
-export type SettingsData = Omit<Settings, 'savedTabGroups'>;
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -92,33 +88,29 @@ function isCurrentRule(value: unknown): value is CurrentRule {
 
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(settingsKey);
-  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[] | Group[]; rules?: LegacyRule[] | CurrentRule[]; retainRestoredGroups?: boolean } | undefined;
-  const { groups, rules, savedTabGroups, retainRestoredGroups: _retainRestoredGroups, ...settings } = value ?? {};
+  const value = stored[settingsKey] as Partial<Settings> & { groups?: LegacyGroup[] | Group[]; rules?: LegacyRule[] | CurrentRule[]; savedTabGroups?: unknown; retainRestoredGroups?: boolean } | undefined;
+  const { groups, rules, savedTabGroups: _savedTabGroups, retainRestoredGroups: _retainRestoredGroups, ...settings } = value ?? {};
   const currentGroups = Array.isArray(groups) && groups.every(isCurrentGroup) ? groups : undefined;
-
-  return {
+  const nextSettings: Settings = {
     ...defaultSettings,
     ...settings,
     groups: currentGroups ?? (Array.isArray(groups) ? migrateLegacyGroups(groups as LegacyGroup[]) : Array.isArray(rules) ? rules.every(isCurrentRule) ? migrateCurrentRules(rules) : migrateLegacyRules(rules as LegacyRule[]) : []),
-    ...(savedTabGroups === undefined ? {} : { savedTabGroups: isSavedTabGroups(savedTabGroups) ? normalizeSavedTabGroups(savedTabGroups) : normalizeSavedTabGroups() }),
   };
-}
 
-export function getSettingsData(settings: Settings): SettingsData {
-  const { savedTabGroups: _savedTabGroups, ...settingsData } = settings;
-  return settingsData;
+  // One-time cleanup of the removed saved-tab module.
+  if (_savedTabGroups !== undefined) void chrome.storage.local.set({ [settingsKey]: nextSettings });
+  return nextSettings;
 }
 
 export async function saveSettings(settings: Settings) {
-  const nextSettings = settings.savedTabGroups === undefined ? settings : { ...settings, savedTabGroups: normalizeSavedTabGroups(settings.savedTabGroups) };
-  await chrome.storage.local.set({ [settingsKey]: nextSettings });
+  await chrome.storage.local.set({ [settingsKey]: settings });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function parseImportedSettings(value: unknown): SettingsData | undefined {
+export function parseImportedSettings(value: unknown): Settings | undefined {
   if (!isRecord(value) || typeof value.enabled !== 'boolean' || typeof value.collapseGroups !== 'boolean' || typeof value.organizeAllWindows !== 'boolean' || !['light', 'dark', 'system'].includes(value.theme as Theme) || !Array.isArray(value.groups)) return undefined;
   const groupIds = new Set<string>();
   const ruleIds = new Set<string>();
@@ -139,5 +131,5 @@ export function parseImportedSettings(value: unknown): SettingsData | undefined 
     }
   }
   const { enabled, collapseGroups, organizeAllWindows, groups, theme } = value;
-  return { enabled, collapseGroups, organizeAllWindows, groups, theme } as SettingsData;
+  return { enabled, collapseGroups, organizeAllWindows, groups, theme } as Settings;
 }

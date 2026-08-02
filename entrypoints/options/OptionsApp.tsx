@@ -3,8 +3,7 @@ import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Layers3, Pal
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
-import { mergeParsedDayTabs, normalizeSavedTabGroups, parseSavedTabLines, serializeSavedTabLines } from '../../src/lib/saved-tabs';
-import { getSettings, getSettingsData, parseImportedSettings, saveSettings, type Settings, type SettingsData, type Theme } from '../../src/lib/settings';
+import { getSettings, parseImportedSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 import { syncGroup } from '../../src/lib/tab-groups';
 
 const operatorLabels: Record<RuleOperator, string> = {
@@ -81,16 +80,14 @@ export function OptionsApp() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();
-  const [importedSettings, setImportedSettings] = useState<SettingsData>();
+  const [importedSettings, setImportedSettings] = useState<Settings>();
   const [importOpen, setImportOpen] = useState(false);
   const [availableRelease, setAvailableRelease] = useState<{ version: string; url: string }>();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string>();
   const [transferMessage, setTransferMessage] = useState<string>();
-  const [savedTabsMessage, setSavedTabsMessage] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance' | 'data'>('groups');
   const settingsImportInput = useRef<HTMLInputElement>(null);
-  const savedTabsImportInput = useRef<HTMLInputElement>(null);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -159,11 +156,7 @@ export function OptionsApp() {
   }
 
   function exportSettings() {
-    downloadFile(JSON.stringify(getSettingsData(settings), null, 2), 'lazytabs.json', 'application/json');
-  }
-
-  function exportSavedTabs() {
-    downloadFile(serializeSavedTabLines(settings.savedTabGroups), 'lazytabs-saved-tabs.txt', 'text/plain');
+    downloadFile(JSON.stringify(settings, null, 2), 'lazytabs.json', 'application/json');
   }
 
   async function loadImport(file?: File) {
@@ -188,27 +181,6 @@ export function OptionsApp() {
     setImportedSettings(undefined);
     setImportOpen(false);
     setTransferMessage('设置已导入。');
-  }
-
-  async function loadSavedTabsImport(file?: File) {
-    if (!file) return;
-    try {
-      const { days, skipped } = parseSavedTabLines(await file.text());
-      const total = Object.values(days).reduce((count, tabs) => count + tabs.length, 0);
-      if (!total) {
-        setSavedTabsMessage(`没有可导入的 HTTP(S) URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
-        return;
-      }
-
-      const currentSettings = await getSettings();
-      const [group] = normalizeSavedTabGroups(currentSettings.savedTabGroups);
-      const nextSettings = { ...currentSettings, savedTabGroups: [mergeParsedDayTabs(group, days)] };
-      await saveSettings(nextSettings);
-      setSettings(nextSettings);
-      setSavedTabsMessage(`已导入 ${total} 条 URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
-    } catch {
-      setSavedTabsMessage('文件不是有效的 LazyTabs 文本列表。');
-    }
   }
 
   async function checkForUpdates() {
@@ -350,24 +322,15 @@ export function OptionsApp() {
           </Card>}
 
           {activeSection === 'data' && <Card>
-            <Card.Header><div><Card.Title>数据</Card.Title><Card.Description>导入导出设置和收纳标签。</Card.Description></div></Card.Header>
+            <Card.Header><div><Card.Title>数据</Card.Title><Card.Description>导入导出设置。</Card.Description></div></Card.Header>
             <Card.Content className="grid gap-6">
               <div className="grid gap-3">
-                <div><p className="m-0 text-sm font-medium">设置数据</p><p className="m-0 mt-1 text-sm text-muted">包含分组规则、通用选项和主题，不包含默认收纳组。</p></div>
+                <div><p className="m-0 text-sm font-medium">设置数据</p><p className="m-0 mt-1 text-sm text-muted">包含分组规则、通用选项和主题。</p></div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出设置</Button>
                   <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => settingsImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入设置</Button>
                   <input ref={settingsImportInput} accept=".json,application/json" className="sr-only" type="file" onChange={(event) => { void loadImport(event.target.files?.[0]); event.target.value = ''; }} />
                   {transferMessage && <span className={transferMessage === '设置已导入。' ? 'text-sm text-success' : 'text-sm text-danger'}>{transferMessage}</span>}
-                </div>
-              </div>
-              <div className="grid gap-3 border-t border-default pt-6">
-                <div><p className="m-0 text-sm font-medium">LazyTabs 文本</p><p className="m-0 mt-1 text-sm text-muted">以文本文件导入或导出收纳标签，每行一条：日期 | URL | 标题，缺省日期归入今天。</p></div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSavedTabs}><Download size={16} strokeWidth={1.9} />导出收纳文本</Button>
-                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => savedTabsImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入收纳文本</Button>
-                  <input ref={savedTabsImportInput} accept=".txt,text/plain" className="sr-only" type="file" onChange={(event) => { void loadSavedTabsImport(event.target.files?.[0]); event.target.value = ''; }} />
-                  {savedTabsMessage && <span className={`${savedTabsMessage.startsWith('已导入') ? 'text-success' : 'text-danger'} text-sm`}>{savedTabsMessage}</span>}
                 </div>
               </div>
             </Card.Content>
@@ -378,7 +341,7 @@ export function OptionsApp() {
               <Modal.Container className="group-editor-container" placement="center" size="sm">
                 <Modal.Dialog className="w-full rounded-lg p-0">
                   <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>导入设置</Modal.Heading></Modal.Header>
-                  <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换当前分组、通用选项和主题，不会修改默认收纳组。</Modal.Body>
+                  <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换当前分组、通用选项和主题。</Modal.Body>
                   <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setImportOpen(false)}>取消</Button><Button onPress={() => void confirmImport()}><Upload size={17} strokeWidth={2} />确认导入</Button></Modal.Footer>
                 </Modal.Dialog>
               </Modal.Container>

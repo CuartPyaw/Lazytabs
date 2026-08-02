@@ -1,13 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getSettings, getSettingsData, parseImportedSettings, type SettingsData } from '../src/lib/settings';
+import { getSettings, parseImportedSettings, type Settings } from '../src/lib/settings';
 
 describe('settings', () => {
   const get = vi.fn();
+  const set = vi.fn();
 
   beforeEach(() => {
     get.mockReset();
-    vi.stubGlobal('chrome', { storage: { local: { get } } });
+    set.mockReset();
+    vi.stubGlobal('chrome', { storage: { local: { get, set } } });
+  });
+
+  it('drops legacy saved tab groups and cleans them from storage', async () => {
+    get.mockResolvedValue({ settings: {
+      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups: [],
+      savedTabGroups: [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [] }],
+    } });
+
+    await expect(getSettings()).resolves.toEqual({
+      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups: [],
+    });
+    expect(set).toHaveBeenCalledWith({ settings: {
+      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups: [],
+    } });
   });
 
   it('migrates saved legacy groups into top-level groups', async () => {
@@ -45,15 +61,12 @@ describe('settings', () => {
   });
 
   it('accepts complete imported settings and rejects invalid configurations', () => {
-    const settings: SettingsData = {
+    const settings: Settings = {
       enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'auto', enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }] }],
     };
-    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
 
     expect(parseImportedSettings(settings)).toEqual(settings);
-    expect(parseImportedSettings({ ...settings, savedTabGroups })).toEqual(settings);
-    expect(getSettingsData({ ...settings, savedTabGroups })).toEqual(settings);
     expect(parseImportedSettings({ ...settings, groups: [{ ...settings.groups[0], rules: [] }] })).toBeUndefined();
     expect(parseImportedSettings({ ...settings, theme: 'violet' })).toBeUndefined();
   });

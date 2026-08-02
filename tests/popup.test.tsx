@@ -15,16 +15,13 @@ const storedSettings = {
 const storageGet = vi.fn();
 const storageSet = vi.fn();
 const sendMessage = vi.fn();
-const tabsQuery = vi.fn();
 
 beforeEach(() => {
   storageGet.mockReset();
   storageSet.mockReset();
   sendMessage.mockReset();
-  tabsQuery.mockReset();
   storageGet.mockResolvedValue({ settings: storedSettings });
   storageSet.mockResolvedValue(undefined);
-  tabsQuery.mockResolvedValue([{ windowId: 7, active: true }]);
   sendMessage.mockImplementation(async (message: { type: string }) => {
     if (message.type === 'popup-state') return { enabled: true, groupCount: 1, tabCount: 3 };
     if (message.type === 'organize-current-window') return { grouped: 1 };
@@ -33,9 +30,6 @@ beforeEach(() => {
     runtime: {
       sendMessage,
       openOptionsPage: vi.fn(),
-    },
-    tabs: {
-      query: tabsQuery,
     },
     storage: {
       local: {
@@ -74,17 +68,6 @@ describe('PopupApp', () => {
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: 'organize-current-window' });
     });
-  });
-
-  it('asks the background to open the tab manager', async () => {
-    render(<PopupApp />);
-
-    fireEvent.click(await screen.findByRole('button', { name: '打开标签管理' }));
-
-    await waitFor(() => {
-      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-dashboard', windowId: 7 });
-    });
-    expect(tabsQuery).toHaveBeenCalledWith({ active: true, currentWindow: true });
   });
 
   it('shows a paused icon when automatic grouping is disabled', async () => {
