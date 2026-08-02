@@ -343,6 +343,7 @@ describe('background commands', () => {
 
     const result = await sendMessage({ type: 'restore-group', groupId: 'video' });
 
+    expect(tabsCreate).toHaveBeenCalledWith({ windowId: 7, url: 'https://example.com/video', active: false });
     expect(tabsGroup).toHaveBeenCalledWith({ groupId: 8, tabIds: [70] });
     expect(tabGroupsUpdate).not.toHaveBeenCalled();
     expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [] }] });

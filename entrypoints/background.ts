@@ -260,14 +260,14 @@ async function createTabInCurrentWindow(savedTab: SavedTab) {
   return { windowId, tabId: tab.id };
 }
 
-async function restoreTabs(savedTabs: SavedTab[], windowId: number): Promise<RestoreResult & { remainingTabs: SavedTab[] }> {
+async function restoreTabs(savedTabs: SavedTab[], windowId: number, active = true): Promise<RestoreResult & { remainingTabs: SavedTab[] }> {
   const restoredTabIds: number[] = [];
   const failedSavedTabIds: string[] = [];
   const errors: string[] = [];
 
   for (const savedTab of savedTabs) {
     try {
-      const tab = await chrome.tabs.create({ windowId, url: savedTab.url });
+      const tab = await chrome.tabs.create({ windowId, url: savedTab.url, ...(active ? {} : { active: false }) });
       if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
       restoredTabIds.push(tab.id);
     } catch (error) {
@@ -331,7 +331,7 @@ async function restoreSavedGroup(groupId: string) {
       return { groupId, windowId, removed: result.failedSavedTabIds.length === 0, restoredTabIds: result.restoredTabIds, failedSavedTabIds: result.failedSavedTabIds, errors: result.errors };
     }
 
-    const result = await restoreTabs(group.tabs, windowId);
+    const result = await restoreTabs(group.tabs, windowId, false);
     const groupingErrors = await groupRestoredTabs(group, result.restoredTabIds, windowId);
     await saveSettings(removeSavedGroup(settings, groupId));
     notifySnapshotChanged('restored-group');
