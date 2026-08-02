@@ -68,3 +68,7 @@ for popup or options UI changes.
 The manifest grants `storage`, `tabs`, and `tabGroups` permissions. Treat
 permission changes and new Chrome API usage as security-sensitive: document
 why they are necessary and test the extension in Chrome before merging.
+
+## 收纳组行为
+
+收纳组恢复标签页时，默认在后台打开，不聚焦。
