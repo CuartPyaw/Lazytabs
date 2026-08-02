@@ -70,6 +70,26 @@ async function collapseOtherGroups(windowId: number, destinationGroupIds?: Set<n
     .map((group) => chrome.tabGroups.update(group.id, { collapsed: true })));
 }
 
+async function collapseToFocusedGroup(queryInfo: chrome.tabs.QueryInfo, groups: Group[]) {
+  const activeTabs = await chrome.tabs.query({ ...queryInfo, active: true });
+  const windowIds = [...new Set(activeTabs.map((tab) => tab.windowId).filter((id): id is number => id !== undefined))];
+  await Promise.allSettled(windowIds.map(async (windowId) => {
+    const activeTab = activeTabs.find((tab) => tab.windowId === windowId);
+    let keepGroupId: number | undefined;
+    if (activeTab?.groupId !== undefined && activeTab.groupId >= 0
+      && matchingGroup({ hostname: hostname(activeTab.url), url: activeTab.url, title: activeTab.title }, groups)) {
+      keepGroupId = activeTab.groupId;
+    }
+    const existingGroups = await chrome.tabGroups.query({ windowId });
+    await Promise.allSettled(existingGroups
+      .filter((group) => group.id !== keepGroupId && !group.collapsed)
+      .map((group) => chrome.tabGroups.update(group.id, { collapsed: true })));
+    if (keepGroupId !== undefined) {
+      await chrome.tabGroups.update(keepGroupId, { collapsed: false });
+    }
+  }));
+}
+
 async function moveUngroupedAfterLastGroup(queryInfo: chrome.tabs.QueryInfo) {
   const tabs = await chrome.tabs.query(queryInfo);
   const tabsByWindow = new Map<number, chrome.tabs.Tab[]>();
@@ -152,30 +172,19 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
   const tabs = await chrome.tabs.query(queryInfo);
   const eligibleTabs = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito)
-  const updatedWindowIds = new Set<number>();
-  const destinationGroupsByWindow = new Map<number, Set<number>>();
   const results = await Promise.allSettled(
     eligibleTabs.map(async (tab) => {
       const result = await groupTabWithGroups(tab.id, settings.groups);
-      if (result) {
-        if (result.previousGroupId !== result.groupId) {
-          updatedWindowIds.add(result.windowId);
-          const destinationGroupIds = destinationGroupsByWindow.get(result.windowId) ?? new Set<number>();
-          destinationGroupIds.add(result.groupId);
-          destinationGroupsByWindow.set(result.windowId, destinationGroupIds);
-        }
-        return true;
-      }
+      if (result) return true;
       if (tab.groupId >= 0) {
         await chrome.tabs.ungroup(tab.id);
-        if (tab.windowId !== undefined) updatedWindowIds.add(tab.windowId);
         return true;
       }
       return false;
     }),
   );
   if (settings.collapseGroups) {
-    await Promise.allSettled([...updatedWindowIds].map((windowId) => collapseOtherGroups(windowId, destinationGroupsByWindow.get(windowId))));
+    await collapseToFocusedGroup(queryInfo, settings.groups);
   }
   if (settings.moveUngroupedToEnd) {
     await moveUngroupedAfterLastGroup(queryInfo);

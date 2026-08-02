@@ -87,6 +87,60 @@ describe('tab groups', () => {
     expect(update).toHaveBeenCalledWith(2, { collapsed: true });
   });
 
+  it('collapses all groups when the focused tab matches no rule', async () => {
+    const update = vi.fn(async () => undefined);
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async (id: number) => ({ id, url: id === 1 ? 'https://youtube.com' : 'https://example.com', windowId: 1 })),
+        group: vi.fn(async () => 1),
+        query: vi.fn(async (query: chrome.tabs.QueryInfo) => query.active
+          ? [{ id: 2, active: true, url: 'https://example.com', windowId: 1, groupId: -1 }]
+          : [{ id: 1, url: 'https://youtube.com', windowId: 1, groupId: -1 }, { id: 2, active: true, url: 'https://example.com', windowId: 1, groupId: -1 }]),
+      },
+      tabGroups: { query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '其他' }]), update },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(1);
+    expect(update).toHaveBeenCalledWith(1, { collapsed: true });
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+  });
+
+  it('keeps only the focused tab\u2019s matched group expanded', async () => {
+    const update = vi.fn(async () => undefined);
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async (id: number) => ({ id, url: id === 1 ? 'https://youtube.com' : 'https://example.com', windowId: 1 })),
+        group: vi.fn(async () => 1),
+        query: vi.fn(async (query: chrome.tabs.QueryInfo) => query.active
+          ? [{ id: 1, active: true, url: 'https://youtube.com', windowId: 1, groupId: 1 }]
+          : [{ id: 1, active: true, url: 'https://youtube.com', windowId: 1, groupId: -1 }, { id: 2, url: 'https://example.com', windowId: 1, groupId: -1 }]),
+      },
+      tabGroups: { query: vi.fn(async () => [{ id: 1, title: '视频', collapsed: true }, { id: 2, title: '其他' }]), update },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(1);
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).toHaveBeenCalledWith(1, { collapsed: false });
+  });
+
+  it('enforces collapse state even when nothing moved', async () => {
+    const update = vi.fn(async () => undefined);
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async () => ({ id: 1, url: 'https://youtube.com', windowId: 1, groupId: 1 })),
+        group: vi.fn(async () => 1),
+        query: vi.fn(async (query: chrome.tabs.QueryInfo) => query.active
+          ? [{ id: 1, active: true, url: 'https://youtube.com', windowId: 1, groupId: 1 }]
+          : [{ id: 1, active: true, url: 'https://youtube.com', windowId: 1, groupId: 1 }]),
+      },
+      tabGroups: { query: vi.fn(async () => [{ id: 1, title: '视频' }, { id: 2, title: '其他' }]), update },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(1);
+    expect(update).toHaveBeenCalledWith(2, { collapsed: true });
+    expect(update).not.toHaveBeenCalledWith(1, { collapsed: true });
+  });
+
   it('organizes accessible tabs across all windows', async () => {
     const group = vi.fn(async (options: chrome.tabs.GroupOptions) => 'createProperties' in options ? 1 : options.groupId);
     const query = vi.fn(async () => [{ id: 1, url: 'https://youtube.com/watch', windowId: 1 }, { id: 2, url: 'https://youtube.com/watch', windowId: 2, incognito: true }]);

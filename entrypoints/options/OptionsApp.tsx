@@ -319,7 +319,7 @@ export function OptionsApp() {
           {activeSection === 'general' && <Card>
             <Card.Header><div><Card.Title>通用</Card.Title><Card.Description>调整标签页整理的默认行为。</Card.Description></div></Card.Header>
             <Card.Content className="grid gap-5">
-              <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后自动折叠</Switch.Content></Switch>
+              <Switch aria-label="整理后折叠其他分组" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后折叠其他分组</Switch.Content></Switch>
               <Switch aria-label="整理后把未分组标签页移到最后一个分组后面" className="soft-switch" isSelected={settings.moveUngroupedToEnd} onChange={(moveUngroupedToEnd) => void updateMoveUngroupedToEnd(moveUngroupedToEnd)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后把未分组标签页移到最后一个分组后面</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
