@@ -197,7 +197,7 @@ export function DashboardApp() {
                 return { group, tabs: visibleTabs.filter((tab) => tab.groupId === group.id), restorableTabIds: groupTabs.filter((tab) => tab.restorable).map((tab) => tab.id) };
               }).filter(({ tabs }) => tabs.length > 0);
               const ungroupedTabs = visibleTabs.filter((tab) => tab.groupId < 0 || !(window.groups ?? []).some((group) => group.id === tab.groupId));
-              return <Card className="w-full min-w-0 overflow-hidden" key={window.id}>
+              return <Card className="w-full min-w-0 shrink-0 overflow-hidden" key={window.id}>
                 <Card.Header className="relative flex flex-col items-stretch gap-3">
                   <div className="pr-10"><Card.Title>窗口 {index + 1}{window.focused ? ' · 当前窗口' : ''}</Card.Title><Card.Description>{window.tabs.length} 个标签</Card.Description></div>
                   <Button className="absolute right-4 top-4" isDisabled={!restorableCount} isIconOnly aria-label="收纳窗口" size="sm" variant="tertiary" onPress={() => void send({ type: 'save-window-tabs', windowId: window.id })}><FolderArchive size={17} strokeWidth={1.8} /></Button>
