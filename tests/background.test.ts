@@ -12,11 +12,13 @@ const {
   tabsQuery,
   tabsGet,
   tabsCreate,
+  tabsGroup,
   tabsUpdate,
   tabsRemove,
   windowsGetCurrent,
   windowsUpdate,
   tabGroupsQuery,
+  tabGroupsUpdate,
   runtimeGetURL,
 } = vi.hoisted(() => ({
   groupTab: vi.fn(),
@@ -28,11 +30,13 @@ const {
   tabsQuery: vi.fn(),
   tabsGet: vi.fn(),
   tabsCreate: vi.fn(),
+  tabsGroup: vi.fn(),
   tabsUpdate: vi.fn(),
   tabsRemove: vi.fn(),
   windowsGetCurrent: vi.fn(),
   windowsUpdate: vi.fn(),
   tabGroupsQuery: vi.fn(),
+  tabGroupsUpdate: vi.fn(),
   runtimeGetURL: vi.fn(),
 }));
 
@@ -68,11 +72,13 @@ describe('background commands', () => {
     tabsQuery.mockResolvedValue([]);
     tabsGet.mockResolvedValue(undefined);
     tabsCreate.mockResolvedValue(undefined);
+    tabsGroup.mockResolvedValue(9);
     tabsUpdate.mockResolvedValue(undefined);
     tabsRemove.mockResolvedValue(undefined);
     windowsGetCurrent.mockResolvedValue({ id: 1, type: 'normal', focused: true });
     windowsUpdate.mockResolvedValue(undefined);
     tabGroupsQuery.mockResolvedValue([]);
+    tabGroupsUpdate.mockResolvedValue(undefined);
     runtimeGetURL.mockReturnValue(dashboardUrl);
     vi.stubGlobal('chrome', {
       commands: { onCommand: { addListener: vi.fn((listener) => commandListeners.push(listener)) } },
@@ -85,6 +91,7 @@ describe('background commands', () => {
         query: tabsQuery,
         get: tabsGet,
         create: tabsCreate,
+        group: tabsGroup,
         update: tabsUpdate,
         remove: tabsRemove,
         onCreated: { addListener: vi.fn() },
@@ -96,6 +103,7 @@ describe('background commands', () => {
       },
       tabGroups: {
         query: tabGroupsQuery,
+        update: tabGroupsUpdate,
         onUpdated: { addListener: vi.fn((listener) => groupUpdatedListeners.push(listener)) },
       },
     });
@@ -284,6 +292,77 @@ describe('background commands', () => {
     expect(result).toMatchObject({ removed: true, restoredTabIds: [70] });
   });
 
+  it('stores a browser group as a nested group and leaves unsupported tabs open', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    tabsQuery.mockResolvedValue([
+      { id: 42, windowId: 1, groupId: 4, url: 'https://example.com/video', title: '视频页', pinned: false, incognito: false },
+      { id: 43, windowId: 1, groupId: 4, url: 'chrome://settings', title: '设置', pinned: false, incognito: false },
+    ] as chrome.tabs.Tab[]);
+    tabGroupsQuery.mockResolvedValue([{ id: 4, windowId: 1, title: '视频', color: 'blue' }] as chrome.tabGroups.TabGroup[]);
+
+    const result = await sendMessage({ type: 'save-tabs', windowId: 1, browserGroupId: 4 });
+
+    expect(result).toMatchObject({ group: { name: '视频', color: 'blue', tabs: [{ title: '视频页', url: 'https://example.com/video' }] } });
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ ...savedTabGroups[0], groups: [{ id: expect.any(String), name: '视频', color: 'blue', createdAt: expect.any(Number), tabs: [{ id: expect.any(String), title: '视频页', url: 'https://example.com/video' }] }] }] });
+    expect(tabsRemove).toHaveBeenCalledWith(42);
+    expect(tabsRemove).not.toHaveBeenCalledWith(43);
+  });
+
+  it('merges saved browser groups by name and color', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [], groups: [{ id: 'video', name: '视频', color: 'blue' as const, createdAt: 1, tabs: [{ id: 'saved-tab', title: '旧视频', url: 'https://example.com/old' }] }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    tabsQuery.mockResolvedValue([{ id: 42, windowId: 1, groupId: 4, url: 'https://example.com/new', title: '新视频', pinned: false, incognito: false }] as chrome.tabs.Tab[]);
+    tabGroupsQuery.mockResolvedValue([{ id: 4, windowId: 1, title: '视频', color: 'blue' }] as chrome.tabGroups.TabGroup[]);
+
+    await sendMessage({ type: 'save-tabs', windowId: 1, browserGroupId: 4 });
+
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ ...savedTabGroups[0], groups: [{ ...savedTabGroups[0].groups[0], tabs: [{ id: 'saved-tab', title: '旧视频', url: 'https://example.com/old' }, expect.objectContaining({ title: '新视频', url: 'https://example.com/new' })] }] }] });
+  });
+
+  it('keeps same-name saved browser groups separate when colors differ', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [], groups: [{ id: 'video-blue', name: '视频', color: 'blue' as const, createdAt: 1, tabs: [] }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    tabsQuery.mockResolvedValue([{ id: 42, windowId: 1, groupId: 4, url: 'https://example.com/new', title: '新视频', pinned: false, incognito: false }] as chrome.tabs.Tab[]);
+    tabGroupsQuery.mockResolvedValue([{ id: 4, windowId: 1, title: '视频', color: 'red' }] as chrome.tabGroups.TabGroup[]);
+
+    await sendMessage({ type: 'save-tabs', windowId: 1, browserGroupId: 4 });
+
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ ...savedTabGroups[0], groups: [savedTabGroups[0].groups[0], expect.objectContaining({ name: '视频', color: 'red', tabs: [expect.objectContaining({ title: '新视频' })] })] }] });
+  });
+
+  it('merges a restored group into the first matching browser group by name and color', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [], groups: [{ id: 'video', name: '视频', color: 'blue' as const, createdAt: 1, tabs: [{ id: 'saved-tab', title: '视频页', url: 'https://example.com/video' }] }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate.mockResolvedValue({ id: 70, windowId: 7, url: 'https://example.com/video' } as chrome.tabs.Tab);
+    tabGroupsQuery.mockResolvedValue([
+      { id: 8, windowId: 7, title: '视频', color: 'blue' },
+      { id: 9, windowId: 7, title: '视频', color: 'red' },
+    ] as chrome.tabGroups.TabGroup[]);
+
+    const result = await sendMessage({ type: 'restore-group', groupId: 'video' });
+
+    expect(tabsGroup).toHaveBeenCalledWith({ groupId: 8, tabIds: [70] });
+    expect(tabGroupsUpdate).not.toHaveBeenCalled();
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [] }] });
+    expect(result).toMatchObject({ removed: true, restoredTabIds: [70] });
+  });
+
+  it('creates a new browser group when the matching name has another color', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [], groups: [{ id: 'video', name: '视频', color: 'blue' as const, createdAt: 1, tabs: [{ id: 'saved-tab', title: '视频页', url: 'https://example.com/video' }] }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate.mockResolvedValue({ id: 70, windowId: 7, url: 'https://example.com/video' } as chrome.tabs.Tab);
+    tabsGroup.mockResolvedValue(10);
+    tabGroupsQuery.mockResolvedValue([{ id: 8, windowId: 7, title: '视频', color: 'red' }] as chrome.tabGroups.TabGroup[]);
+
+    await sendMessage({ type: 'restore-group', groupId: 'video' });
+
+    expect(tabsGroup).toHaveBeenCalledWith({ createProperties: { windowId: 7 }, tabIds: [70] });
+    expect(tabGroupsUpdate).toHaveBeenCalledWith(10, { title: '视频', color: 'blue' });
+  });
+
   it('opens an individual saved tab in the background and removes its record', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
     getSettings.mockResolvedValue({ savedTabGroups });
@@ -295,6 +374,17 @@ describe('background commands', () => {
     expect(tabsCreate).toHaveBeenCalledWith({ windowId: 7, url: 'https://example.com/docs', active: false });
     expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [] }] });
     expect(result).toMatchObject({ tab: { windowId: 7, id: 70 } });
+  });
+
+  it('removes an empty nested group after opening its last saved tab', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [], groups: [{ id: 'video', name: '视频', color: 'blue' as const, createdAt: 1, tabs: [{ id: 'saved-tab', title: '视频页', url: 'https://example.com/video' }] }] }];
+    getSettings.mockResolvedValue({ savedTabGroups });
+    windowsGetCurrent.mockResolvedValue({ id: 7, type: 'normal', focused: true });
+    tabsCreate.mockResolvedValue({ id: 70, windowId: 7, url: 'https://example.com/video' } as chrome.tabs.Tab);
+
+    await sendMessage({ type: 'open-tab', groupId: 'video', savedTabId: 'saved-tab' });
+
+    expect(saveSettings).toHaveBeenCalledWith({ savedTabGroups: [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [] }] });
   });
 
   it('keeps restore-all opening tabs with the existing behavior', async () => {

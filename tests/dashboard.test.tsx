@@ -168,6 +168,24 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
   });
 
+  it('renders saved browser groups and restores a whole nested group', async () => {
+    activeSnapshot = {
+      ...snapshot,
+      savedTabGroups: [{
+        ...snapshot.savedTabGroups[0],
+        tabs: [],
+        groups: [{ id: 'saved-video', name: '视频', color: 'blue', createdAt: 1, tabs: [{ id: 'saved-video-1', title: '视频页', url: 'https://example.com/video' }] }],
+      }],
+    } as unknown as typeof snapshot;
+    render(<DashboardApp />);
+
+    expect(await screen.findByText('视频')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '恢复分组 视频' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '恢复分组 视频' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'restore-group', groupId: 'saved-video' }));
+  });
+
   it('opens every saved tab in the background from the saved group card', async () => {
     activeSnapshot = {
       ...snapshot,
@@ -219,7 +237,7 @@ describe('DashboardApp', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '收纳分组 工作' }));
 
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, tabIds: [10] }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', windowId: 1, browserGroupId: 7 }));
   });
 
   it('shows background message errors', async () => {

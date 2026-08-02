@@ -22,4 +22,8 @@ describe('saved tabs import and export', () => {
       { id: 'two', url: 'https://example.com/two', title: 'Two' },
     ] }])).toBe('https://example.com/one | One\nhttps://example.com/two | Two');
   });
+
+  it('includes nested group tabs in OneTab exports', () => {
+    expect(serializeOneTabUrls([{ id: 'outer', name: '默认收纳组', createdAt: 1, tabs: [{ id: 'one', url: 'https://example.com/one', title: 'One' }], groups: [{ id: 'inner', name: '视频', color: 'blue', createdAt: 1, tabs: [{ id: 'two', url: 'https://example.com/two', title: 'Two' }] }] }])).toBe('https://example.com/one | One\nhttps://example.com/two | Two');
+  });
 });

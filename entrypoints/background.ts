@@ -1,5 +1,6 @@
 import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
-import { isRestorableTab, normalizeSavedTabGroups, removeSavedTab, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
+import { GROUP_COLORS, type GroupColor } from '../src/lib/rules';
+import { createSavedTabGroup, findSavedTabGroup, isRestorableTab, normalizeSavedTabGroups, removeSavedGroup, removeSavedTab, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
 import { getSettings, saveSettings, type Settings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
@@ -130,38 +131,117 @@ async function closeTabs(tabIds: number[]): Promise<CloseTabsResult> {
   };
 }
 
-async function saveTabs(tabIds: number[] | undefined, windowId: number | undefined, groupId?: string) {
+type SavedTabEntry = { sourceTabId: number; tab: SavedTab };
+
+type SaveBatch = {
+  entries: SavedTabEntry[];
+  skippedTabIds: number[];
+  browserGroup?: chrome.tabGroups.TabGroup;
+};
+
+type NormalizedSettings = Settings & { savedTabGroups: SavedTabGroup[] };
+
+function collectSavedTabs(tabs: chrome.tabs.Tab[]): Omit<SaveBatch, 'browserGroup'> {
+  const entries: SavedTabEntry[] = [];
+  const skippedTabIds: number[] = [];
+
+  for (const tab of tabs) {
+    if (tab.id === undefined) continue;
+    const savedTab = toSavedTab(tab);
+    if (savedTab) entries.push({ sourceTabId: tab.id, tab: savedTab });
+    else skippedTabIds.push(tab.id);
+  }
+
+  return { entries, skippedTabIds };
+}
+
+function browserGroupColor(group: chrome.tabGroups.TabGroup): GroupColor {
+  return GROUP_COLORS.includes(group.color as GroupColor) ? group.color as GroupColor : 'grey';
+}
+
+function applySaveBatch(settings: NormalizedSettings, batch: SaveBatch): { settings: NormalizedSettings; group: SavedTabGroup } {
+  const savedTabs = batch.entries.map((entry) => entry.tab);
+  const outerGroup = settings.savedTabGroups[0];
+
+  if (!batch.browserGroup) {
+    const group = { ...outerGroup, tabs: [...outerGroup.tabs, ...savedTabs] };
+    return { settings: { ...settings, savedTabGroups: [group] }, group };
+  }
+
+  const savedGroup = createSavedTabGroup(batch.browserGroup.title?.trim() || '未命名分组', browserGroupColor(batch.browserGroup), savedTabs);
+  const existingGroup = (outerGroup.groups ?? []).find((group) => group.name === savedGroup.name && group.color === savedGroup.color);
+  if (existingGroup) {
+    const group = { ...existingGroup, tabs: [...existingGroup.tabs, ...savedGroup.tabs] };
+    const groups = (outerGroup.groups ?? []).map((item) => item.id === group.id ? group : item);
+    return { settings: { ...settings, savedTabGroups: [{ ...outerGroup, groups }] }, group };
+  }
+
+  const groups = [...(outerGroup.groups ?? []), savedGroup];
+  return { settings: { ...settings, savedTabGroups: [{ ...outerGroup, groups }] }, group: savedGroup };
+}
+
+async function getBrowserGroup(windowId: number, groupId: number) {
+  const group = (await chrome.tabGroups.query({ windowId })).find((item) => item.id === groupId);
+  if (!group) throw new Error('找不到要收纳的浏览器分组。');
+  return group;
+}
+
+async function saveTabs(tabIds: number[] | undefined, windowId: number | undefined, groupId?: string, browserGroupId?: number) {
   return withSavedTabsLock(async () => {
     const selectedTabIds = tabIds ? uniqueNumbers(tabIds) : undefined;
-    const { tabs, failedTabIds } = await getTabsForSave(selectedTabIds, windowId);
-    const savedTabs: Array<{ sourceTabId: number; tab: SavedTab }> = [];
-    const skippedTabIds: number[] = [];
+    const targetWindowId = browserGroupId === undefined ? windowId : windowId ?? await currentWindowId();
+    const { tabs, failedTabIds } = browserGroupId === undefined
+      ? await getTabsForSave(selectedTabIds, windowId)
+      : { tabs: await chrome.tabs.query({ windowId: targetWindowId, groupId: browserGroupId }), failedTabIds: [] as number[] };
+    const batch = { ...collectSavedTabs(tabs), ...(browserGroupId === undefined ? {} : { browserGroup: await getBrowserGroup(targetWindowId!, browserGroupId) }) };
 
-    for (const tab of tabs) {
-      if (tab.id === undefined) continue;
-      const savedTab = toSavedTab(tab);
-      if (savedTab) savedTabs.push({ sourceTabId: tab.id, tab: savedTab });
-      else skippedTabIds.push(tab.id);
-    }
-
-    if (!savedTabs.length) throw new Error('没有可收纳的网页标签。');
+    if (!batch.entries.length) throw new Error('没有可收纳的网页标签。');
 
     const rawSettings = await getSettings();
     const settings = normalizeSettings(rawSettings);
-    const targetGroup = settings.savedTabGroups[0];
-    if (groupId && groupId !== targetGroup.id) throw new Error('只能使用默认收纳组。');
-
-    const group = { ...targetGroup, tabs: [...targetGroup.tabs, ...savedTabs.map((item) => item.tab)] };
-    const nextSettings = { ...settings, savedTabGroups: [group] };
+    if (groupId && groupId !== settings.savedTabGroups[0].id) throw new Error('只能使用默认收纳组。');
+    const { settings: nextSettings, group } = applySaveBatch(settings, batch);
 
     // Persist before closing tabs so a browser API failure cannot lose the records.
     await saveSettings(nextSettings);
-    const closeResult = await closeTabs(savedTabs.map((item) => item.sourceTabId));
+    const closeResult = await closeTabs(batch.entries.map((item) => item.sourceTabId));
     notifySnapshotChanged('saved-tabs');
 
     return {
       group,
-      skippedTabIds: [...new Set([...failedTabIds, ...skippedTabIds])],
+      skippedTabIds: [...new Set([...failedTabIds, ...batch.skippedTabIds])],
+      ...closeResult,
+    };
+  });
+}
+
+async function saveWindowTabs(windowId: number) {
+  return withSavedTabsLock(async () => {
+    const [tabs, browserGroups] = await Promise.all([
+      chrome.tabs.query({ windowId }),
+      chrome.tabGroups.query({ windowId }),
+    ]);
+    const batches: SaveBatch[] = browserGroups.map((browserGroup) => ({
+      ...collectSavedTabs(tabs.filter((tab) => tab.groupId === browserGroup.id)),
+      browserGroup,
+    }));
+    batches.push(collectSavedTabs(tabs.filter((tab) => (tab.groupId ?? -1) < 0)));
+
+    const validBatches = batches.filter((batch) => batch.entries.length > 0);
+    if (!validBatches.length) throw new Error('没有可收纳的网页标签。');
+
+    const settings = normalizeSettings(await getSettings());
+    let nextSettings = settings;
+    const entries = validBatches.flatMap((batch) => batch.entries);
+    for (const batch of validBatches) nextSettings = applySaveBatch(nextSettings, batch).settings;
+
+    await saveSettings(nextSettings);
+    const closeResult = await closeTabs(entries.map((entry) => entry.sourceTabId));
+    notifySnapshotChanged('saved-tabs');
+
+    return {
+      group: nextSettings.savedTabGroups[0],
+      skippedTabIds: [...new Set(batches.flatMap((batch) => batch.skippedTabIds))],
       ...closeResult,
     };
   });
@@ -180,12 +260,12 @@ async function createTabInCurrentWindow(savedTab: SavedTab) {
   return { windowId, tabId: tab.id };
 }
 
-async function restoreGroup(settings: Settings, group: SavedTabGroup, windowId: number): Promise<RestoreResult & { remainingTabs: SavedTab[] }> {
+async function restoreTabs(savedTabs: SavedTab[], windowId: number): Promise<RestoreResult & { remainingTabs: SavedTab[] }> {
   const restoredTabIds: number[] = [];
   const failedSavedTabIds: string[] = [];
   const errors: string[] = [];
 
-  for (const savedTab of group.tabs) {
+  for (const savedTab of savedTabs) {
     try {
       const tab = await chrome.tabs.create({ windowId, url: savedTab.url });
       if (tab.id === undefined) throw new Error('新标签创建成功但未返回标签 ID。');
@@ -196,14 +276,35 @@ async function restoreGroup(settings: Settings, group: SavedTabGroup, windowId: 
     }
   }
 
-  return { restoredTabIds, failedSavedTabIds, errors, remainingTabs: group.tabs.filter((tab) => failedSavedTabIds.includes(tab.id)), };
+  return { restoredTabIds, failedSavedTabIds, errors, remainingTabs: savedTabs.filter((tab) => failedSavedTabIds.includes(tab.id)), };
+}
+
+async function groupRestoredTabs(savedGroup: SavedTabGroup, restoredTabIds: number[], windowId: number) {
+  if (!restoredTabIds.length) return [];
+
+  try {
+    const tabIds = restoredTabIds as [number, ...number[]];
+    const groupTabs = chrome.tabs.group as unknown as (options: chrome.tabs.GroupOptions) => Promise<number>;
+    const color = savedGroup.color ?? 'grey';
+    const existingGroup = (await chrome.tabGroups.query({ windowId })).find((group) => group.title === savedGroup.name && group.color === color);
+    if (existingGroup) {
+      await groupTabs({ groupId: existingGroup.id, tabIds });
+      return [];
+    }
+
+    const groupId = await groupTabs({ createProperties: { windowId }, tabIds });
+    await chrome.tabGroups.update(groupId, { title: savedGroup.name, color });
+    return [];
+  } catch (error) {
+    return [errorMessage(error)];
+  }
 }
 
 async function restoreSavedTab(groupId: string, savedTabId: string) {
   return withSavedTabsLock(async () => {
     const rawSettings = await getSettings();
     const settings = normalizeSettings(rawSettings);
-    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    const group = findSavedTabGroup(settings.savedTabGroups, groupId);
     const savedTab = group?.tabs.find((item) => item.id === savedTabId);
     if (!group || !savedTab) throw new Error('找不到要恢复的收纳记录。');
 
@@ -218,42 +319,56 @@ async function restoreSavedGroup(groupId: string) {
   return withSavedTabsLock(async () => {
     const rawSettings = await getSettings();
     const settings = normalizeSettings(rawSettings);
-    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    const outerGroup = settings.savedTabGroups[0];
+    const group = findSavedTabGroup(settings.savedTabGroups, groupId);
     if (!group) throw new Error('找不到要恢复的收纳组。');
 
     const windowId = await currentWindowId();
-    const result = await restoreGroup(settings, group, windowId);
-    if (result.failedSavedTabIds.length < group.tabs.length) {
-      const savedTabGroups = settings.savedTabGroups.map((item) => item.id === groupId ? { ...item, tabs: result.remainingTabs } : item);
-      await saveSettings({ ...settings, savedTabGroups });
+    if (group.id === outerGroup.id) {
+      const result = await restoreTabs(group.tabs, windowId);
+      await saveSettings({ ...settings, savedTabGroups: [{ ...outerGroup, tabs: result.remainingTabs }] });
       notifySnapshotChanged('restored-group');
+      return { groupId, windowId, removed: result.failedSavedTabIds.length === 0, restoredTabIds: result.restoredTabIds, failedSavedTabIds: result.failedSavedTabIds, errors: result.errors };
     }
 
-    const { remainingTabs: _remainingTabs, ...response } = result;
-    return { groupId, windowId, removed: result.failedSavedTabIds.length === 0, ...response };
+    const result = await restoreTabs(group.tabs, windowId);
+    const groupingErrors = await groupRestoredTabs(group, result.restoredTabIds, windowId);
+    await saveSettings(removeSavedGroup(settings, groupId));
+    notifySnapshotChanged('restored-group');
+    return { groupId, windowId, removed: true, restoredTabIds: result.restoredTabIds, failedSavedTabIds: result.failedSavedTabIds, errors: [...result.errors, ...groupingErrors] };
   });
+}
+
+async function restoreFlatGroup(group: SavedTabGroup, windowId: number) {
+  const result = await restoreTabs(group.tabs, windowId);
+  const nestedGroups: SavedTabGroup[] = [];
+  let restoredTabIds = result.restoredTabIds;
+  let failedSavedTabIds = result.failedSavedTabIds;
+  let errors = result.errors;
+
+  for (const nestedGroup of group.groups ?? []) {
+    const nestedResult = await restoreFlatGroup(nestedGroup, windowId);
+    if (nestedResult.group.tabs.length || nestedResult.group.groups?.length) nestedGroups.push(nestedResult.group);
+    restoredTabIds = [...restoredTabIds, ...nestedResult.restoredTabIds];
+    failedSavedTabIds = [...failedSavedTabIds, ...nestedResult.failedSavedTabIds];
+    errors = [...errors, ...nestedResult.errors];
+  }
+
+  const nextGroup = nestedGroups.length ? { ...group, tabs: result.remainingTabs, groups: nestedGroups } : { ...group, tabs: result.remainingTabs };
+  return { group: nextGroup, restoredTabIds, failedSavedTabIds, errors };
 }
 
 async function restoreAllSavedGroups() {
   return withSavedTabsLock(async () => {
     const rawSettings = await getSettings();
     const settings = normalizeSettings(rawSettings);
-    const groups = settings.savedTabGroups;
     const windowId = await currentWindowId();
-    const remainingGroups: SavedTabGroup[] = [];
-    const restoredTabIds: number[] = [];
-    const failedSavedTabIds: string[] = [];
-    const errors: string[] = [];
+    const results = await Promise.all(settings.savedTabGroups.map((group) => restoreFlatGroup(group, windowId)));
+    const restoredTabIds = results.flatMap((result) => result.restoredTabIds);
+    const failedSavedTabIds = results.flatMap((result) => result.failedSavedTabIds);
+    const errors = results.flatMap((result) => result.errors);
 
-    for (const group of groups) {
-      const result = await restoreGroup(settings, group, windowId);
-      restoredTabIds.push(...result.restoredTabIds);
-      failedSavedTabIds.push(...result.failedSavedTabIds);
-      errors.push(...result.errors);
-      remainingGroups.push({ ...group, tabs: result.remainingTabs });
-    }
-
-    await saveSettings({ ...settings, savedTabGroups: remainingGroups });
+    await saveSettings({ ...settings, savedTabGroups: results.map((result) => result.group) });
     notifySnapshotChanged('restored-all');
 
     return { windowId, restoredTabIds, failedSavedTabIds, errors, removed: failedSavedTabIds.length === 0 };
@@ -268,7 +383,7 @@ async function deleteSavedTab(groupId: string, savedTabId: string) {
   return withSavedTabsLock(async () => {
     const rawSettings = await getSettings();
     const settings = normalizeSettings(rawSettings);
-    const group = settings.savedTabGroups?.find((item) => item.id === groupId);
+    const group = findSavedTabGroup(settings.savedTabGroups, groupId);
     if (!group?.tabs.some((tab) => tab.id === savedTabId)) return { groupId, savedTabId, deleted: false };
     await saveSettings(removeSavedTab(settings, groupId, savedTabId));
     notifySnapshotChanged('deleted-tab');
@@ -297,7 +412,7 @@ async function openTab(message: BackgroundMessage) {
     if (typeof message.url === 'string') url = message.url;
     if (groupId && savedTabId) {
       settings = normalizeSettings(await getSettings());
-      url = settings.savedTabGroups?.find((group) => group.id === groupId)?.tabs.find((tab) => tab.id === savedTabId)?.url;
+      url = findSavedTabGroup(settings.savedTabGroups, groupId)?.tabs.find((tab) => tab.id === savedTabId)?.url;
     }
     if (!url || !/^https?:\/\//.test(url)) throw new Error('只能打开可恢复的网页地址。');
 
@@ -380,8 +495,8 @@ export default defineBackground(() => {
     }
 
     if (message?.type === 'get-snapshot') return respondAsync(readSnapshot, sendResponse);
-    if (message?.type === 'save-window-tabs') return respondAsync(() => saveTabs(undefined, typeof message.windowId === 'number' ? message.windowId : undefined), sendResponse);
-    if (message?.type === 'save-tabs') return respondAsync(() => saveTabs(uniqueNumbers(message.tabIds), typeof message.windowId === 'number' ? message.windowId : undefined, typeof message.groupId === 'string' ? message.groupId : undefined), sendResponse);
+    if (message?.type === 'save-window-tabs') return respondAsync(async () => saveWindowTabs(typeof message.windowId === 'number' ? message.windowId : await currentWindowId()), sendResponse);
+    if (message?.type === 'save-tabs') return respondAsync(() => saveTabs(uniqueNumbers(message.tabIds), typeof message.windowId === 'number' ? message.windowId : undefined, typeof message.groupId === 'string' ? message.groupId : undefined, typeof message.browserGroupId === 'number' ? message.browserGroupId : undefined), sendResponse);
     if (message?.type === 'restore-tab') return respondAsync(() => restoreSavedTab(String(message.groupId), String(message.savedTabId)), sendResponse);
     if (message?.type === 'restore-group') return respondAsync(() => restoreSavedGroup(String(message.groupId)), sendResponse);
     if (message?.type === 'restore-all') return respondAsync(restoreAllSavedGroups, sendResponse);
