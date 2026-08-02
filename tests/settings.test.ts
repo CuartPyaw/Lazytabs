@@ -19,10 +19,10 @@ describe('settings', () => {
     } });
 
     await expect(getSettings()).resolves.toEqual({
-      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups: [],
+      enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, theme: 'system', groups: [],
     });
     expect(set).toHaveBeenCalledWith({ settings: {
-      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups: [],
+      enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, theme: 'system', groups: [],
     } });
   });
 
@@ -30,7 +30,7 @@ describe('settings', () => {
     get.mockResolvedValue({ settings: { enabled: true, groups: [{ id: 'code', name: '代码', color: 'blue', enabled: true, rules: [{ id: 'github', pattern: 'github.com' }, { id: 'github-subdomain', pattern: '*.github.com' }] }] } });
 
     await expect(getSettings()).resolves.toEqual({
-      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system',
+      enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, theme: 'system',
       groups: [{
         id: 'code', name: '代码', color: 'blue', enabled: true,
         rules: [
@@ -62,11 +62,12 @@ describe('settings', () => {
 
   it('accepts complete imported settings and rejects invalid configurations', () => {
     const settings: Settings = {
-      enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system',
+      enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, theme: 'system',
       groups: [{ id: 'video', name: '视频', color: 'auto', enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }] }],
     };
 
     expect(parseImportedSettings(settings)).toEqual(settings);
+    expect(parseImportedSettings({ ...settings, moveUngroupedToEnd: undefined })).toEqual({ ...settings, moveUngroupedToEnd: false });
     expect(parseImportedSettings({ ...settings, groups: [{ ...settings.groups[0], rules: [] }] })).toBeUndefined();
     expect(parseImportedSettings({ ...settings, theme: 'violet' })).toBeUndefined();
   });

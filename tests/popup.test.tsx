@@ -9,6 +9,7 @@ const storedSettings = {
   enabled: true,
   collapseGroups: true,
   organizeAllWindows: false,
+  moveUngroupedToEnd: false,
   theme: 'system' as const,
   groups: [{ id: 'video', name: '视频', color: 'blue' as const, enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname' as const, operator: 'contains' as const, value: 'youtube.com' }] }] }],
 };

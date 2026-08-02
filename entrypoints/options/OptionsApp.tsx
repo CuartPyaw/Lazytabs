@@ -74,7 +74,7 @@ function cloneGroup(group: Group): GroupInput {
 }
 
 export function OptionsApp() {
-  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' });
+  const [settings, setSettings] = useState<Settings>({ enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, groups: [], theme: 'system' });
   const [draft, setDraft] = useState<GroupInput>(emptyGroup);
   const [editingId, setEditingId] = useState<string>();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -100,7 +100,7 @@ export function OptionsApp() {
       if (areaName !== 'local' || !changes.settings) return;
 
       const nextSettings = changes.settings.newValue as Settings | undefined;
-      if (nextSettings?.groups && nextSettings.theme && typeof nextSettings.collapseGroups === 'boolean' && typeof nextSettings.organizeAllWindows === 'boolean') {
+      if (nextSettings?.groups && nextSettings.theme && typeof nextSettings.collapseGroups === 'boolean' && typeof nextSettings.organizeAllWindows === 'boolean' && typeof nextSettings.moveUngroupedToEnd === 'boolean') {
         setSettings(nextSettings);
       } else {
         void getSettings().then(setSettings);
@@ -142,6 +142,13 @@ export function OptionsApp() {
   async function updateOrganizeAllWindows(organizeAllWindows: boolean) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, organizeAllWindows };
+    setSettings(next);
+    await saveSettings(next);
+  }
+
+  async function updateMoveUngroupedToEnd(moveUngroupedToEnd: boolean) {
+    const currentSettings = await getSettings();
+    const next = { ...currentSettings, moveUngroupedToEnd };
     setSettings(next);
     await saveSettings(next);
   }
@@ -313,6 +320,7 @@ export function OptionsApp() {
             <Card.Header><div><Card.Title>通用</Card.Title><Card.Description>调整标签页整理的默认行为。</Card.Description></div></Card.Header>
             <Card.Content className="grid gap-5">
               <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后自动折叠</Switch.Content></Switch>
+              <Switch aria-label="整理后把未分组标签页移到最后一个分组后面" className="soft-switch" isSelected={settings.moveUngroupedToEnd} onChange={(moveUngroupedToEnd) => void updateMoveUngroupedToEnd(moveUngroupedToEnd)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后把未分组标签页移到最后一个分组后面</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
                 <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>

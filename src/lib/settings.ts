@@ -4,6 +4,7 @@ export type Settings = {
   enabled: boolean;
   collapseGroups: boolean;
   organizeAllWindows: boolean;
+  moveUngroupedToEnd: boolean;
   groups: Group[];
   theme: Theme;
 };
@@ -36,7 +37,7 @@ type LegacyGroup = {
 };
 
 const settingsKey = 'settings';
-const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, groups: [], theme: 'system' };
+const defaultSettings: Settings = { enabled: true, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, groups: [], theme: 'system' };
 
 function conditionForPattern(pattern: string, id: string): MatchCondition {
   const value = pattern.trim().toLowerCase().replace(/\.$/, '');
@@ -130,6 +131,8 @@ export function parseImportedSettings(value: unknown): Settings | undefined {
       }
     }
   }
+  const moveUngroupedToEnd = value.moveUngroupedToEnd === undefined ? false : value.moveUngroupedToEnd;
+  if (typeof moveUngroupedToEnd !== 'boolean') return undefined;
   const { enabled, collapseGroups, organizeAllWindows, groups, theme } = value;
-  return { enabled, collapseGroups, organizeAllWindows, groups, theme } as Settings;
+  return { enabled, collapseGroups, organizeAllWindows, moveUngroupedToEnd, groups, theme } as Settings;
 }

@@ -9,6 +9,7 @@ const storedSettings = {
   enabled: true,
   collapseGroups: true,
   organizeAllWindows: false,
+  moveUngroupedToEnd: false,
   theme: 'system' as const,
   groups: [{
     id: 'video', name: '视频', color: 'blue' as const, enabled: true,
@@ -49,6 +50,13 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
     fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
+  });
+
+  it('persists moving ungrouped tabs after the last group', async () => {
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
+    fireEvent.click(await screen.findByRole('switch', { name: '整理后把未分组标签页移到最后一个分组后面' }));
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, moveUngroupedToEnd: true } }));
   });
 
   it('opens a group editor with nested matching rules', async () => {

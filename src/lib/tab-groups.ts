@@ -70,6 +70,30 @@ async function collapseOtherGroups(windowId: number, destinationGroupIds?: Set<n
     .map((group) => chrome.tabGroups.update(group.id, { collapsed: true })));
 }
 
+async function moveUngroupedAfterLastGroup(queryInfo: chrome.tabs.QueryInfo) {
+  const tabs = await chrome.tabs.query(queryInfo);
+  const tabsByWindow = new Map<number, chrome.tabs.Tab[]>();
+  for (const tab of tabs) {
+    if (tab.windowId === undefined) continue;
+    const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
+    windowTabs.push(tab);
+    tabsByWindow.set(tab.windowId, windowTabs);
+  }
+  for (const windowTabs of tabsByWindow.values()) {
+    const sorted = [...windowTabs].sort((a, b) => a.index - b.index);
+    const lastGroupedIndex = [...sorted].reverse().find((tab) => tab.groupId >= 0)?.index;
+    if (lastGroupedIndex === undefined) continue;
+    const ungrouped = sorted.filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined && !tab.pinned && !tab.incognito && tab.groupId < 0);
+    for (const tab of ungrouped) {
+      try {
+        await chrome.tabs.move(tab.id, { index: -1 });
+      } catch {
+        // tab closed while organizing; skip it
+      }
+    }
+  }
+}
+
 export async function groupTab(tabId: number) {
   const settings = await getSettings();
   if (!settings.enabled) return false;
@@ -152,6 +176,9 @@ async function organizeTabs(queryInfo: chrome.tabs.QueryInfo) {
   );
   if (settings.collapseGroups) {
     await Promise.allSettled([...updatedWindowIds].map((windowId) => collapseOtherGroups(windowId, destinationGroupsByWindow.get(windowId))));
+  }
+  if (settings.moveUngroupedToEnd) {
+    await moveUngroupedAfterLastGroup(queryInfo);
   }
   return results.filter((result) => result.status === 'fulfilled' && result.value).length;
 }

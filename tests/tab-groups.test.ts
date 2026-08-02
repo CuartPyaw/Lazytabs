@@ -14,7 +14,7 @@ const youtubeGroup: Group = {
 };
 
 function settings(groups = [youtubeGroup], enabled = true): Settings {
-  return { enabled, collapseGroups: true, organizeAllWindows: false, theme: 'system', groups };
+  return { enabled, collapseGroups: true, organizeAllWindows: false, moveUngroupedToEnd: false, theme: 'system', groups };
 }
 
 describe('tab groups', () => {
@@ -97,6 +97,34 @@ describe('tab groups', () => {
 
     await expect(organizeAllWindows()).resolves.toBe(1);
     expect(query).toHaveBeenCalledWith({});
+  });
+
+  it('moves ungrouped tabs after the last group when enabled', async () => {
+    const move = vi.fn(async () => undefined);
+    mockedGetSettings.mockResolvedValue({ ...settings(), moveUngroupedToEnd: true });
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn(async (tabId: number) => ({ id: tabId, url: tabId === 3 ? 'https://example.com' : 'https://youtube.com/watch', windowId: 1 })),
+        group: vi.fn(async (options: chrome.tabs.GroupOptions) => 'createProperties' in options ? 1 : options.groupId),
+        query: vi.fn()
+          .mockResolvedValueOnce([
+            { id: 1, url: 'https://youtube.com/watch', windowId: 1, index: 0, groupId: -1 },
+            { id: 2, url: 'https://youtube.com/watch', windowId: 1, index: 1, groupId: -1 },
+            { id: 3, url: 'https://example.com', windowId: 1, index: 2, groupId: -1 },
+          ])
+          .mockResolvedValue([
+            { id: 1, url: 'https://youtube.com/watch', windowId: 1, index: 0, groupId: 1 },
+            { id: 2, url: 'https://youtube.com/watch', windowId: 1, index: 1, groupId: 1 },
+            { id: 3, url: 'https://example.com', windowId: 1, index: 2, groupId: -1 },
+          ]),
+        move,
+      },
+      tabGroups: { query: vi.fn(async () => []), update: vi.fn(async () => undefined) },
+    });
+
+    await expect(organizeCurrentWindow()).resolves.toBe(2);
+    expect(move).toHaveBeenCalledTimes(1);
+    expect(move).toHaveBeenCalledWith(3, { index: -1 });
   });
 
   it('syncs a browser group rename to the matching group and other windows', async () => {
