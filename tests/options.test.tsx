@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OptionsApp } from '../entrypoints/options/OptionsApp';
+import { todayDayKey } from '../src/lib/saved-tabs';
 
 const storedSettings = {
   enabled: true,
@@ -118,22 +119,31 @@ describe('OptionsApp interactions', () => {
     fireEvent.change(document.querySelector('input[accept=".json,application/json"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
     fireEvent.click(await screen.findByRole('button', { name: '确认导入' }));
 
-    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...importedSettings, savedTabGroups } }));
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
+      settings: {
+        ...importedSettings,
+        savedTabGroups: [{
+          id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [],
+          groups: [{ id: expect.any(String), name: todayDayKey(), createdAt: expect.any(Number), kind: 'day', tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }],
+        }],
+      },
+    }));
   });
 
-  it('appends valid OneTab URLs and reports skipped lines', async () => {
+  it('imports dated saved tab lines into day groups and reports skipped lines', async () => {
     render(<OptionsApp />);
     fireEvent.click(await screen.findByRole('button', { name: '数据' }));
-    fireEvent.change(document.querySelector('input[accept=".txt,text/plain"]')!, { target: { files: [new File(['https://example.com/one | Example\nnot-a-url\nhttps://example.com/one | Example'], 'onetab.txt', { type: 'text/plain' })] } });
+    fireEvent.change(document.querySelector('input[accept=".txt,text/plain"]')!, { target: { files: [new File(['2026-08-01 | https://example.com/one | Example\nnot-a-url\nhttps://example.com/two | Example'], 'lazytabs.txt', { type: 'text/plain' })] } });
 
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
       settings: {
         ...storedSettings,
         savedTabGroups: [{
           id: 'default-saved-group', name: '默认收纳组', createdAt: 0,
-          tabs: [
-            { id: expect.any(String), title: 'Example', url: 'https://example.com/one' },
-            { id: expect.any(String), title: 'Example', url: 'https://example.com/one' },
+          tabs: [],
+          groups: [
+            { id: expect.any(String), name: todayDayKey(), createdAt: expect.any(Number), kind: 'day', tabs: [{ id: expect.any(String), title: 'Example', url: 'https://example.com/two' }] },
+            { id: expect.any(String), name: '2026-08-01', createdAt: expect.any(Number), kind: 'day', tabs: [{ id: expect.any(String), title: 'Example', url: 'https://example.com/one' }] },
           ],
         }],
       },

@@ -1,6 +1,6 @@
 import { groupTab, organizeAllWindows, organizeCurrentWindow, syncGroupName } from '../src/lib/tab-groups';
 import { GROUP_COLORS, type GroupColor } from '../src/lib/rules';
-import { createSavedTabGroup, findSavedTabGroup, isRestorableTab, normalizeSavedTabGroups, removeSavedGroup, removeSavedTab, toSavedTab, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
+import { createDaySavedTabGroup, createSavedTabGroup, findSavedTabGroup, isRestorableTab, normalizeSavedTabGroups, removeSavedGroup, removeSavedTab, toSavedTab, todayDayKey, type SavedTab, type SavedTabGroup } from '../src/lib/saved-tabs';
 import { getSettings, saveSettings, type Settings } from '../src/lib/settings';
 import { defineBackground } from 'wxt/utils/define-background';
 
@@ -162,22 +162,29 @@ function browserGroupColor(group: chrome.tabGroups.TabGroup): GroupColor {
 function applySaveBatch(settings: NormalizedSettings, batch: SaveBatch): { settings: NormalizedSettings; group: SavedTabGroup } {
   const savedTabs = batch.entries.map((entry) => entry.tab);
   const outerGroup = settings.savedTabGroups[0];
+  const todayKey = todayDayKey();
+  const dayGroup = (outerGroup.groups ?? []).find((group) => group.kind === 'day' && group.name === todayKey) ?? createDaySavedTabGroup(todayKey, []);
 
   if (!batch.browserGroup) {
-    const group = { ...outerGroup, tabs: [...outerGroup.tabs, ...savedTabs] };
-    return { settings: { ...settings, savedTabGroups: [group] }, group };
+    const group = { ...dayGroup, tabs: [...dayGroup.tabs, ...savedTabs] };
+    return { settings: { ...settings, savedTabGroups: withDayGroup(outerGroup, group) }, group };
   }
 
   const savedGroup = createSavedTabGroup(batch.browserGroup.title?.trim() || '未命名分组', browserGroupColor(batch.browserGroup), savedTabs);
-  const existingGroup = (outerGroup.groups ?? []).find((group) => group.name === savedGroup.name && group.color === savedGroup.color);
+  const existingGroup = (dayGroup.groups ?? []).find((group) => group.name === savedGroup.name && group.color === savedGroup.color);
   if (existingGroup) {
-    const group = { ...existingGroup, tabs: [...existingGroup.tabs, ...savedGroup.tabs] };
-    const groups = (outerGroup.groups ?? []).map((item) => item.id === group.id ? group : item);
-    return { settings: { ...settings, savedTabGroups: [{ ...outerGroup, groups }] }, group };
+    const merged = { ...existingGroup, tabs: [...existingGroup.tabs, ...savedGroup.tabs] };
+    const group = { ...dayGroup, groups: (dayGroup.groups ?? []).map((item) => item.id === merged.id ? merged : item) };
+    return { settings: { ...settings, savedTabGroups: withDayGroup(outerGroup, group) }, group };
   }
 
-  const groups = [...(outerGroup.groups ?? []), savedGroup];
-  return { settings: { ...settings, savedTabGroups: [{ ...outerGroup, groups }] }, group: savedGroup };
+  const group = { ...dayGroup, groups: [...(dayGroup.groups ?? []), savedGroup] };
+  return { settings: { ...settings, savedTabGroups: withDayGroup(outerGroup, group) }, group };
+}
+
+function withDayGroup(outerGroup: SavedTabGroup, dayGroup: SavedTabGroup): SavedTabGroup[] {
+  const groups = [...(outerGroup.groups ?? []).filter((group) => group.id !== dayGroup.id), dayGroup];
+  return [{ ...outerGroup, groups }];
 }
 
 async function getBrowserGroup(windowId: number, groupId: number) {
@@ -331,6 +338,13 @@ async function restoreSavedGroup(groupId: string) {
       return { groupId, windowId, removed: result.failedSavedTabIds.length === 0, restoredTabIds: result.restoredTabIds, failedSavedTabIds: result.failedSavedTabIds, errors: result.errors };
     }
 
+    if (group.kind === 'day') {
+      const result = await restoreDayGroup(group, windowId);
+      await saveSettings(removeSavedGroup(settings, groupId));
+      notifySnapshotChanged('restored-group');
+      return { groupId, windowId, removed: true, restoredTabIds: result.restoredTabIds, failedSavedTabIds: result.failedSavedTabIds, errors: result.errors };
+    }
+
     const result = await restoreTabs(group.tabs, windowId, false);
     const groupingErrors = await groupRestoredTabs(group, result.restoredTabIds, windowId);
     await saveSettings(removeSavedGroup(settings, groupId));
@@ -339,8 +353,23 @@ async function restoreSavedGroup(groupId: string) {
   });
 }
 
+async function restoreDayGroup(group: SavedTabGroup, windowId: number): Promise<RestoreResult> {
+  const results = [await restoreTabs(group.tabs, windowId, false)];
+  const groupingErrors: string[] = [];
+  for (const nestedGroup of group.groups ?? []) {
+    const nestedResult = await restoreTabs(nestedGroup.tabs, windowId, false);
+    groupingErrors.push(...await groupRestoredTabs(nestedGroup, nestedResult.restoredTabIds, windowId));
+    results.push(nestedResult);
+  }
+  return {
+    restoredTabIds: results.flatMap((result) => result.restoredTabIds),
+    failedSavedTabIds: results.flatMap((result) => result.failedSavedTabIds),
+    errors: [...results.flatMap((result) => result.errors), ...groupingErrors],
+  };
+}
+
 async function restoreFlatGroup(group: SavedTabGroup, windowId: number) {
-  const result = await restoreTabs(group.tabs, windowId);
+  const result = await restoreTabs(group.tabs, windowId, false);
   const nestedGroups: SavedTabGroup[] = [];
   let restoredTabIds = result.restoredTabIds;
   let failedSavedTabIds = result.failedSavedTabIds;
@@ -354,7 +383,8 @@ async function restoreFlatGroup(group: SavedTabGroup, windowId: number) {
     errors = [...errors, ...nestedResult.errors];
   }
 
-  const nextGroup = nestedGroups.length ? { ...group, tabs: result.remainingTabs, groups: nestedGroups } : { ...group, tabs: result.remainingTabs };
+  const { groups: _groups, ...rest } = group;
+  const nextGroup: SavedTabGroup = nestedGroups.length ? { ...rest, tabs: result.remainingTabs, groups: nestedGroups } : { ...rest, tabs: result.remainingTabs };
   return { group: nextGroup, restoredTabIds, failedSavedTabIds, errors };
 }
 

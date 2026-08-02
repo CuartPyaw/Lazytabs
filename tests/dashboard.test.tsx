@@ -16,7 +16,7 @@ const snapshot = {
       { id: 11, windowId: 1, groupId: -1, active: false, pinned: true, title: '固定页', url: 'chrome://extensions', favIconUrl: '', restorable: false },
     ],
   }],
-  savedTabGroups: [{ id: 'group-1', name: '窗口 1', createdAt: 1, tabs: [{ id: 'saved-1', title: '文档', url: 'https://example.com/docs' }] }],
+  savedTabGroups: [{ id: 'group-1', name: '窗口 1', createdAt: 1, tabs: [], groups: [{ id: 'day-1', name: '2026-08-02', kind: 'day' as const, createdAt: 1, tabs: [{ id: 'saved-1', title: '文档', url: 'https://example.com/docs' }] }] }],
 };
 
 const secondWindow = {
@@ -152,7 +152,7 @@ describe('DashboardApp', () => {
     const tabButton = (await screen.findByText('GitHub')).closest('button');
     expect(tabButton).toBeTruthy();
     fireEvent.click(tabButton!);
-    expect(screen.getByText('默认收纳组')).toBeTruthy();
+    expect(screen.getByText('暂无标签，点击左侧网页即可加入。')).toBeTruthy();
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'save-tabs', groupId: 'default-saved-group', windowId: 1, tabIds: [10] }));
   });
 
@@ -165,7 +165,7 @@ describe('DashboardApp', () => {
 
     fireEvent.click(savedTabButton!);
 
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' }));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'day-1', savedTabId: 'saved-1' }));
   });
 
   it('renders saved browser groups and restores a whole nested group', async () => {
@@ -173,8 +173,10 @@ describe('DashboardApp', () => {
       ...snapshot,
       savedTabGroups: [{
         ...snapshot.savedTabGroups[0],
-        tabs: [],
-        groups: [{ id: 'saved-video', name: '视频', color: 'blue', createdAt: 1, tabs: [{ id: 'saved-video-1', title: '视频页', url: 'https://example.com/video' }] }],
+        groups: [{
+          ...snapshot.savedTabGroups[0].groups![0],
+          groups: [{ id: 'saved-video', name: '视频', color: 'blue', createdAt: 1, tabs: [{ id: 'saved-video-1', title: '视频页', url: 'https://example.com/video' }] }],
+        }],
       }],
     } as unknown as typeof snapshot;
     render(<DashboardApp />);
@@ -186,26 +188,25 @@ describe('DashboardApp', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'restore-group', groupId: 'saved-video' }));
   });
 
-  it('opens every saved tab in the background from the saved group card', async () => {
+  it('restores a whole day card', async () => {
     activeSnapshot = {
       ...snapshot,
       savedTabGroups: [{
         ...snapshot.savedTabGroups[0],
-        tabs: [
-          ...snapshot.savedTabGroups[0].tabs,
-          { id: 'saved-2', title: '文档 2', url: 'https://example.com/other' },
-        ],
+        groups: [{
+          ...snapshot.savedTabGroups[0].groups![0],
+          tabs: [
+            ...snapshot.savedTabGroups[0].groups![0].tabs,
+            { id: 'saved-2', title: '文档 2', url: 'https://example.com/other' },
+          ],
+        }],
       }],
     };
     render(<DashboardApp />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '恢复默认收纳组' }));
+    fireEvent.click(await screen.findByRole('button', { name: '恢复 2026-08-02' }));
 
-    await waitFor(() => {
-      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-1' });
-      expect(sendMessage).toHaveBeenCalledWith({ type: 'open-tab', groupId: 'group-1', savedTabId: 'saved-2' });
-    });
-    expect(sendMessage).not.toHaveBeenCalledWith({ type: 'restore-group', groupId: 'group-1' });
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: 'restore-group', groupId: 'day-1' }));
   });
 
   it('does not let an older snapshot restore cleared saved tabs', async () => {
@@ -224,7 +225,7 @@ describe('DashboardApp', () => {
 
     messageListeners.forEach((listener) => listener({ type: 'snapshot-changed' }));
     messageListeners.forEach((listener) => listener({ type: 'snapshot-changed' }));
-    resolveLatest?.({ ...snapshot, savedTabGroups: [{ ...snapshot.savedTabGroups[0], tabs: [] }] });
+    resolveLatest?.({ ...snapshot, savedTabGroups: [{ ...snapshot.savedTabGroups[0], tabs: [], groups: [] }] });
     await waitFor(() => expect(screen.queryByText('文档')).toBeNull());
     resolveOlder?.(snapshot);
     await new Promise((resolve) => setTimeout(resolve, 0));

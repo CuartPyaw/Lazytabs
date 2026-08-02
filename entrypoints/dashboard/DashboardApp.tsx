@@ -3,7 +3,7 @@ import { CircleAlert, FolderArchive, Globe2, Layers3, RotateCcw, Search, Trash2,
 import { useEffect, useRef, useState } from 'react';
 
 import { getSettings, type Settings } from '../../src/lib/settings';
-import { DEFAULT_SAVED_TAB_GROUP_ID, DEFAULT_SAVED_TAB_GROUP_NAME } from '../../src/lib/saved-tabs';
+import { DEFAULT_SAVED_TAB_GROUP_ID, DEFAULT_SAVED_TAB_GROUP_NAME, flattenSavedTabs, type SavedTab, type SavedTabGroup } from '../../src/lib/saved-tabs';
 
 type BrowserTab = {
   id: number;
@@ -28,22 +28,6 @@ type BrowserWindow = {
   focused: boolean;
   groups: BrowserGroup[];
   tabs: BrowserTab[];
-};
-
-type SavedTab = {
-  id: string;
-  title: string;
-  url: string;
-  favIconUrl?: string;
-};
-
-type SavedTabGroup = {
-  id: string;
-  name: string;
-  createdAt: number;
-  tabs: SavedTab[];
-  color?: string;
-  groups?: SavedTabGroup[];
 };
 
 type Snapshot = {
@@ -131,24 +115,16 @@ export function DashboardApp() {
   }
 
   const savedGroup = snapshot?.savedTabGroups[0] ?? { id: DEFAULT_SAVED_TAB_GROUP_ID, name: DEFAULT_SAVED_TAB_GROUP_NAME, createdAt: 0, tabs: [] };
-  const visibleSavedTabs = savedGroup.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url));
-  const visibleSavedGroups = (savedGroup.groups ?? [])
-    .map((group) => ({ group, tabs: group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url)) }))
-    .filter(({ tabs }) => tabs.length > 0);
-  const hasSavedTabs = savedGroup.tabs.length > 0 || (savedGroup.groups ?? []).some((group) => group.tabs.length > 0);
-
-  async function openSavedGroupTabs() {
-    try {
-      for (const tab of savedGroup.tabs) {
-        const response = await chrome.runtime.sendMessage({ type: 'open-tab', groupId: savedGroup.id, savedTabId: tab.id }) as { error?: unknown };
-        if (typeof response?.error === 'string') throw new Error(response.error);
-      }
-      setError(undefined);
-      await loadSnapshot();
-    } catch (reason) {
-      setError(reason instanceof Error && reason.message ? reason.message : '操作失败，请重试。');
-    }
-  }
+  const dayGroups = (savedGroup.groups ?? []).filter((group) => group.kind === 'day').sort((a, b) => b.name.localeCompare(a.name));
+  const totalSavedTabs = savedGroup.tabs.length + dayGroups.reduce((count, group) => count + flattenSavedTabs(group).length, 0);
+  const hasSavedTabs = totalSavedTabs > 0;
+  const visibleDayGroups = dayGroups.map((group) => ({
+    group,
+    tabs: group.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url)),
+    groups: (group.groups ?? [])
+      .map((subGroup) => ({ group: subGroup, tabs: subGroup.tabs.filter((tab) => matchesSearch(search, tab.title, tab.url)) }))
+      .filter(({ tabs }) => tabs.length > 0),
+  })).filter(({ tabs, groups }) => tabs.length > 0 || groups.length > 0);
 
   function handleTabClick(windowId: number, tab: BrowserTab) {
     if (!tab.restorable) {
@@ -222,26 +198,28 @@ export function DashboardApp() {
           </section>
 
           <section className="no-scrollbar flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto" aria-labelledby="saved-groups-heading">
-            <div className="sticky top-0 z-10 bg-background"><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${savedGroup.tabs.length} 个单项 · ${(savedGroup.groups ?? []).length} 个分组` : '正在加载'}</p></div>
-            {snapshot && <div aria-label={`收纳组 ${savedGroup.name}`} className="min-w-0" role="region"><Card className="w-full min-w-0 overflow-hidden">
-              <Card.Header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-48 flex-1"><Card.Title>{savedGroup.name}</Card.Title><Card.Description>{savedGroup.tabs.length} 个单项 · {(savedGroup.groups ?? []).length} 个分组</Card.Description></div>
-                <Button isDisabled={!savedGroup.tabs.length} isIconOnly aria-label="恢复默认收纳组" size="sm" variant="tertiary" onPress={() => void openSavedGroupTabs()}><RotateCcw size={16} strokeWidth={1.8} /></Button>
-              </Card.Header>
-              <Card.Content className="pt-0"><div className="space-y-3">
-                {visibleSavedTabs.length > 0 && <div className="border-y border-default">{visibleSavedTabs.map((tab) => renderSavedTab(savedGroup.id, tab))}</div>}
-                {visibleSavedGroups.map(({ group, tabs }) => <div className="overflow-hidden rounded-lg border border-default" key={group.id}>
-                  <div className="flex items-center gap-2 border-b border-default px-3 py-2.5">
-                    <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${groupColorClasses[group.color ?? 'grey'] ?? 'bg-default-500'}`} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{group.name}</span>
-                    <span className="text-xs text-muted">{group.tabs.length} 个标签</span>
-                    <Button isDisabled={!group.tabs.length} isIconOnly aria-label={`恢复分组 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button>
-                  </div>
-                  <div className="px-3">{tabs.map((tab) => renderSavedTab(group.id, tab))}</div>
-                </div>)}
-                {!visibleSavedTabs.length && !visibleSavedGroups.length && <p className="m-0 py-6 text-center text-sm text-muted">{hasSavedTabs ? '没有匹配的标签。' : '暂无标签，点击左侧网页即可加入。'}</p>}
-              </div></Card.Content>
-            </Card></div>}
+            <div className="sticky top-0 z-10 bg-background"><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${totalSavedTabs} 个标签 · ${dayGroups.length} 个日期` : '正在加载'}</p></div>
+            {snapshot && <div aria-label="收纳组" className="min-w-0 space-y-4" role="region">
+              {visibleDayGroups.map(({ group, tabs: visibleTabs, groups: visibleGroups }) => <Card className="w-full min-w-0 overflow-hidden" key={group.id}>
+                <Card.Header className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-48 flex-1"><Card.Title>{group.name}</Card.Title><Card.Description>共 {flattenSavedTabs(group).length} 个标签</Card.Description></div>
+                  <Button isDisabled={!group.tabs.length && !(group.groups ?? []).some((subGroup) => subGroup.tabs.length)} isIconOnly aria-label={`恢复 ${group.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: group.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button>
+                </Card.Header>
+                <Card.Content className="pt-0"><div className="space-y-3">
+                  {visibleTabs.length > 0 && <div className="border-y border-default">{visibleTabs.map((tab) => renderSavedTab(group.id, tab))}</div>}
+                  {visibleGroups.map(({ group: subGroup, tabs }) => <div className="overflow-hidden rounded-lg border border-default" key={subGroup.id}>
+                    <div className="flex items-center gap-2 border-b border-default px-3 py-2.5">
+                      <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${groupColorClasses[subGroup.color ?? 'grey'] ?? 'bg-default-500'}`} />
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{subGroup.name}</span>
+                      <span className="text-xs text-muted">{tabs.length} 个标签</span>
+                      <Button isDisabled={!subGroup.tabs.length} isIconOnly aria-label={`恢复分组 ${subGroup.name}`} size="sm" variant="tertiary" onPress={() => void send({ type: 'restore-group', groupId: subGroup.id })}><RotateCcw size={16} strokeWidth={1.8} /></Button>
+                    </div>
+                    <div className="px-3">{tabs.map((tab) => renderSavedTab(subGroup.id, tab))}</div>
+                  </div>)}
+                </div></Card.Content>
+              </Card>)}
+              {!visibleDayGroups.length && <p className="m-0 py-6 text-center text-sm text-muted">{hasSavedTabs ? '没有匹配的标签。' : '暂无标签，点击左侧网页即可加入。'}</p>}
+            </div>}
           </section>
         </div>
       </div>

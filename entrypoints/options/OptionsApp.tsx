@@ -3,7 +3,7 @@ import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Layers3, Pal
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
-import { normalizeSavedTabGroups, parseOneTabUrls, serializeOneTabUrls } from '../../src/lib/saved-tabs';
+import { mergeParsedDayTabs, normalizeSavedTabGroups, parseSavedTabLines, serializeSavedTabLines } from '../../src/lib/saved-tabs';
 import { getSettings, getSettingsData, parseImportedSettings, saveSettings, type Settings, type SettingsData, type Theme } from '../../src/lib/settings';
 import { syncGroup } from '../../src/lib/tab-groups';
 
@@ -87,10 +87,10 @@ export function OptionsApp() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string>();
   const [transferMessage, setTransferMessage] = useState<string>();
-  const [oneTabMessage, setOneTabMessage] = useState<string>();
+  const [savedTabsMessage, setSavedTabsMessage] = useState<string>();
   const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance' | 'data'>('groups');
   const settingsImportInput = useRef<HTMLInputElement>(null);
-  const oneTabImportInput = useRef<HTMLInputElement>(null);
+  const savedTabsImportInput = useRef<HTMLInputElement>(null);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -162,8 +162,8 @@ export function OptionsApp() {
     downloadFile(JSON.stringify(getSettingsData(settings), null, 2), 'lazytabs.json', 'application/json');
   }
 
-  function exportOneTabUrls() {
-    downloadFile(serializeOneTabUrls(settings.savedTabGroups), 'lazytabs-onetab.txt', 'text/plain');
+  function exportSavedTabs() {
+    downloadFile(serializeSavedTabLines(settings.savedTabGroups), 'lazytabs-saved-tabs.txt', 'text/plain');
   }
 
   async function loadImport(file?: File) {
@@ -190,23 +190,24 @@ export function OptionsApp() {
     setTransferMessage('设置已导入。');
   }
 
-  async function loadOneTabImport(file?: File) {
+  async function loadSavedTabsImport(file?: File) {
     if (!file) return;
     try {
-      const { tabs, skipped } = parseOneTabUrls(await file.text());
-      if (!tabs.length) {
-        setOneTabMessage(`没有可导入的 HTTP(S) URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
+      const { days, skipped } = parseSavedTabLines(await file.text());
+      const total = Object.values(days).reduce((count, tabs) => count + tabs.length, 0);
+      if (!total) {
+        setSavedTabsMessage(`没有可导入的 HTTP(S) URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
         return;
       }
 
       const currentSettings = await getSettings();
       const [group] = normalizeSavedTabGroups(currentSettings.savedTabGroups);
-      const nextSettings = { ...currentSettings, savedTabGroups: [{ ...group, tabs: [...group.tabs, ...tabs] }] };
+      const nextSettings = { ...currentSettings, savedTabGroups: [mergeParsedDayTabs(group, days)] };
       await saveSettings(nextSettings);
       setSettings(nextSettings);
-      setOneTabMessage(`已导入 ${tabs.length} 条 URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
+      setSavedTabsMessage(`已导入 ${total} 条 URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
     } catch {
-      setOneTabMessage('文件不是有效的 OneTab URL 列表。');
+      setSavedTabsMessage('文件不是有效的 LazyTabs 文本列表。');
     }
   }
 
@@ -349,7 +350,7 @@ export function OptionsApp() {
           </Card>}
 
           {activeSection === 'data' && <Card>
-            <Card.Header><div><Card.Title>数据</Card.Title><Card.Description>导入导出设置和默认收纳组中的标签。</Card.Description></div></Card.Header>
+            <Card.Header><div><Card.Title>数据</Card.Title><Card.Description>导入导出设置和收纳标签。</Card.Description></div></Card.Header>
             <Card.Content className="grid gap-6">
               <div className="grid gap-3">
                 <div><p className="m-0 text-sm font-medium">设置数据</p><p className="m-0 mt-1 text-sm text-muted">包含分组规则、通用选项和主题，不包含默认收纳组。</p></div>
@@ -361,12 +362,12 @@ export function OptionsApp() {
                 </div>
               </div>
               <div className="grid gap-3 border-t border-default pt-6">
-                <div><p className="m-0 text-sm font-medium">OneTab URL</p><p className="m-0 mt-1 text-sm text-muted">以文本文件导入或导出默认收纳组中的 URL。</p></div>
+                <div><p className="m-0 text-sm font-medium">LazyTabs 文本</p><p className="m-0 mt-1 text-sm text-muted">以文本文件导入或导出收纳标签，每行一条：日期 | URL | 标题，缺省日期归入今天。</p></div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportOneTabUrls}><Download size={16} strokeWidth={1.9} />导出 OneTab URL</Button>
-                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => oneTabImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入 OneTab URL</Button>
-                  <input ref={oneTabImportInput} accept=".txt,text/plain" className="sr-only" type="file" onChange={(event) => { void loadOneTabImport(event.target.files?.[0]); event.target.value = ''; }} />
-                  {oneTabMessage && <span className={`${oneTabMessage.startsWith('已导入') ? 'text-success' : 'text-danger'} text-sm`}>{oneTabMessage}</span>}
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSavedTabs}><Download size={16} strokeWidth={1.9} />导出收纳文本</Button>
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => savedTabsImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入收纳文本</Button>
+                  <input ref={savedTabsImportInput} accept=".txt,text/plain" className="sr-only" type="file" onChange={(event) => { void loadSavedTabsImport(event.target.files?.[0]); event.target.value = ''; }} />
+                  {savedTabsMessage && <span className={`${savedTabsMessage.startsWith('已导入') ? 'text-success' : 'text-danger'} text-sm`}>{savedTabsMessage}</span>}
                 </div>
               </div>
             </Card.Content>
