@@ -14,7 +14,6 @@ const {
   tabsCreate,
   tabsUpdate,
   tabsRemove,
-  windowsGetAll,
   windowsGetCurrent,
   windowsUpdate,
   tabGroupsQuery,
@@ -31,7 +30,6 @@ const {
   tabsCreate: vi.fn(),
   tabsUpdate: vi.fn(),
   tabsRemove: vi.fn(),
-  windowsGetAll: vi.fn(),
   windowsGetCurrent: vi.fn(),
   windowsUpdate: vi.fn(),
   tabGroupsQuery: vi.fn(),
@@ -72,7 +70,6 @@ describe('background commands', () => {
     tabsCreate.mockResolvedValue(undefined);
     tabsUpdate.mockResolvedValue(undefined);
     tabsRemove.mockResolvedValue(undefined);
-    windowsGetAll.mockResolvedValue([]);
     windowsGetCurrent.mockResolvedValue({ id: 1, type: 'normal', focused: true });
     windowsUpdate.mockResolvedValue(undefined);
     tabGroupsQuery.mockResolvedValue([]);
@@ -94,7 +91,6 @@ describe('background commands', () => {
         onUpdated: { addListener: vi.fn() },
       },
       windows: {
-        getAll: windowsGetAll,
         getCurrent: windowsGetCurrent,
         update: windowsUpdate,
       },
@@ -139,23 +135,13 @@ describe('background commands', () => {
     expect(organizeCurrentWindow).not.toHaveBeenCalled();
   });
 
-  it('returns only the focused normal window and excludes its dashboard tab', async () => {
+  it('returns current window tabs and excludes its dashboard tab when a popup is focused', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
     getSettings.mockResolvedValue({ savedTabGroups });
-    windowsGetAll.mockResolvedValue([
-      { id: 1, type: 'normal', focused: false, tabs: [{ id: 11, windowId: 1, url: 'https://other.example' }] },
-      {
-        id: 2,
-        type: 'normal',
-        focused: true,
-        state: 'maximized',
-        tabs: [
-          { id: 20, windowId: 2, url: dashboardUrl, title: 'LazyTabs' },
-          { id: 21, windowId: 2, url: 'https://example.com/docs', title: '文档', active: true, status: 'complete' },
-        ],
-      },
-      { id: 3, type: 'incognito', focused: false, tabs: [{ id: 31, windowId: 3, url: 'https://private.example' }] },
-    ] as chrome.windows.Window[]);
+    tabsQuery.mockResolvedValue([
+      { id: 20, windowId: 2, url: dashboardUrl, title: 'LazyTabs' },
+      { id: 21, windowId: 2, url: 'https://example.com/docs', title: '文档', active: true, status: 'complete' },
+    ] as chrome.tabs.Tab[]);
     tabGroupsQuery.mockResolvedValue([{ id: 4, windowId: 2, title: '社区', color: 'blue' }] as chrome.tabGroups.TabGroup[]);
 
     const snapshot = await sendMessage({ type: 'get-snapshot' });
@@ -164,7 +150,7 @@ describe('background commands', () => {
       windows: [{
         id: 2,
         focused: true,
-        state: 'maximized',
+        state: 'normal',
         groups: [{ id: 4, title: '社区', color: 'blue' }],
         tabs: [{
           id: 21,
@@ -182,15 +168,13 @@ describe('background commands', () => {
       }],
       savedTabGroups,
     });
+    expect(tabsQuery).toHaveBeenCalledWith({ currentWindow: true });
   });
 
-  it('returns no windows when the focused window is not a normal window', async () => {
+  it('returns no windows when the current window has no tabs', async () => {
     const savedTabGroups = [{ id: 'saved-group', name: '收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
     getSettings.mockResolvedValue({ savedTabGroups });
-    windowsGetAll.mockResolvedValue([
-      { id: 1, type: 'normal', focused: false, incognito: false, alwaysOnTop: false, tabs: [] },
-      { id: 2, type: 'incognito', focused: true, incognito: true, alwaysOnTop: false, tabs: [] },
-    ] as chrome.windows.Window[]);
+    tabsQuery.mockResolvedValue([]);
 
     const snapshot = await sendMessage({ type: 'get-snapshot' });
 

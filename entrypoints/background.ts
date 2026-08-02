@@ -65,14 +65,14 @@ function serializeTab(tab: chrome.tabs.Tab, windowId: number) {
 }
 
 async function readSnapshot() {
-  const [rawSettings, windows, groups] = await Promise.all([
+  const [rawSettings, tabs, groups] = await Promise.all([
     getSettings(),
-    chrome.windows.getAll({ populate: true }),
+    chrome.tabs.query({ currentWindow: true }),
     chrome.tabGroups.query({}),
   ]);
   const settings = normalizeSettings(rawSettings);
   const dashboardUrl = chrome.runtime.getURL('dashboard.html');
-  const focusedWindow = windows.find((window) => window.focused === true && (!window.type || window.type === 'normal'));
+  const windowId = tabs.find((tab) => tab.windowId !== undefined)?.windowId;
 
   const groupsByWindow = new Map<number, chrome.tabGroups.TabGroup[]>();
   groups.forEach((group) => {
@@ -82,17 +82,13 @@ async function readSnapshot() {
   });
 
   return {
-    windows: focusedWindow === undefined ? [] : [focusedWindow].flatMap((window) => {
-      if (window.id === undefined || (window.type && window.type !== 'normal')) return [];
-      const windowId = window.id;
-      return [{
-        id: windowId,
-        focused: window.focused === true,
-        state: window.state ?? 'normal',
-        groups: groupsByWindow.get(windowId)?.map((group) => ({ id: group.id, title: group.title ?? '', color: group.color })) ?? [],
-        tabs: (window.tabs ?? []).filter((tab): tab is chrome.tabs.Tab => tab !== undefined && tab.id !== undefined && tab.url !== dashboardUrl).map((tab) => serializeTab(tab, windowId)),
-      }];
-    }),
+    windows: windowId === undefined ? [] : [{
+      id: windowId,
+      focused: true,
+      state: 'normal',
+      groups: groupsByWindow.get(windowId)?.map((group) => ({ id: group.id, title: group.title ?? '', color: group.color })) ?? [],
+      tabs: tabs.filter((tab) => tab.id !== undefined && tab.url !== dashboardUrl).map((tab) => serializeTab(tab, windowId)),
+    }],
     savedTabGroups: settings.savedTabGroups ?? [],
   };
 }
