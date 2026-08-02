@@ -176,8 +176,8 @@ export function DashboardApp() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 lg:overflow-hidden">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:h-full lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
-          <section className="flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-gutter:stable]" aria-labelledby="current-tabs-heading">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+          <section className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:[scrollbar-gutter:stable]" aria-labelledby="current-tabs-heading">
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-background"><div><h1 className="m-0 text-lg font-semibold" id="current-tabs-heading">当前标签</h1><p className="m-0 mt-1 text-sm text-muted">跟随当前浏览器窗口</p></div>{snapshot && <span className="text-sm text-muted">{currentWindow?.tabs.length ?? 0} 个标签</span>}</div>
             {!snapshot && <><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></>}
             {snapshot && currentWindows.length === 0 && <EmptyState icon={<Layers3 size={23} strokeWidth={1.7} />} title="没有普通窗口" description="打开网页标签后会显示在这里。" />}
@@ -221,7 +221,7 @@ export function DashboardApp() {
             })}
           </section>
 
-          <section className="flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-gutter:stable]" aria-labelledby="saved-groups-heading">
+          <section className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:[scrollbar-gutter:stable]" aria-labelledby="saved-groups-heading">
             <div className="sticky top-0 z-10 bg-background"><h2 className="m-0 text-lg font-semibold" id="saved-groups-heading">收纳组</h2><p className="m-0 mt-1 text-sm text-muted">{snapshot ? `${savedGroup.tabs.length} 个单项 · ${(savedGroup.groups ?? []).length} 个分组` : '正在加载'}</p></div>
             {snapshot && <div aria-label={`收纳组 ${savedGroup.name}`} className="min-w-0" role="region"><Card className="w-full min-w-0 overflow-hidden">
               <Card.Header className="flex flex-wrap items-start justify-between gap-3">
