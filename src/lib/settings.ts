@@ -10,6 +10,8 @@ export type Settings = {
   savedTabGroups?: SavedTabGroup[];
 };
 
+export type SettingsData = Omit<Settings, 'savedTabGroups'>;
+
 export type Theme = 'light' | 'dark' | 'system';
 
 type LegacyPattern = {
@@ -102,6 +104,11 @@ export async function getSettings(): Promise<Settings> {
   };
 }
 
+export function getSettingsData(settings: Settings): SettingsData {
+  const { savedTabGroups: _savedTabGroups, ...settingsData } = settings;
+  return settingsData;
+}
+
 export async function saveSettings(settings: Settings) {
   const nextSettings = settings.savedTabGroups === undefined ? settings : { ...settings, savedTabGroups: normalizeSavedTabGroups(settings.savedTabGroups) };
   await chrome.storage.local.set({ [settingsKey]: nextSettings });
@@ -111,16 +118,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function parseImportedSettings(value: unknown): Settings | undefined {
+export function parseImportedSettings(value: unknown): SettingsData | undefined {
   if (!isRecord(value) || typeof value.enabled !== 'boolean' || typeof value.collapseGroups !== 'boolean' || typeof value.organizeAllWindows !== 'boolean' || !['light', 'dark', 'system'].includes(value.theme as Theme) || !Array.isArray(value.groups)) return undefined;
-  if (value.savedTabGroups !== undefined && !isSavedTabGroups(value.savedTabGroups)) return undefined;
-
   const groupIds = new Set<string>();
   const ruleIds = new Set<string>();
   const conditionIds = new Set<string>();
   const groupNames = new Set<string>();
   for (const group of value.groups) {
-    if (!isRecord(group) || typeof group.id !== 'string' || !group.id || groupIds.has(group.id) || typeof group.name !== 'string' || !group.name.trim() || groupNames.has(group.name) || !GROUP_COLORS.includes(group.color as GroupColor) || typeof group.enabled !== 'boolean' || !Array.isArray(group.rules) || !group.rules.length) return undefined;
+    if (!isRecord(group) || typeof group.id !== 'string' || !group.id || groupIds.has(group.id) || typeof group.name !== 'string' || !group.name.trim() || groupNames.has(group.name) || (group.color !== 'auto' && !GROUP_COLORS.includes(group.color as GroupColor)) || typeof group.enabled !== 'boolean' || !Array.isArray(group.rules) || !group.rules.length) return undefined;
     groupIds.add(group.id);
     groupNames.add(group.name);
     for (const rule of group.rules) {
@@ -133,9 +138,6 @@ export function parseImportedSettings(value: unknown): Settings | undefined {
       }
     }
   }
-  const { retainRestoredGroups: _retainRestoredGroups, ...settings } = value;
-  return {
-    ...settings,
-    ...(value.savedTabGroups === undefined ? {} : { savedTabGroups: normalizeSavedTabGroups(value.savedTabGroups as SavedTabGroup[]) }),
-  } as Settings;
+  const { enabled, collapseGroups, organizeAllWindows, groups, theme } = value;
+  return { enabled, collapseGroups, organizeAllWindows, groups, theme } as SettingsData;
 }

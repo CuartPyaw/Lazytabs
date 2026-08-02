@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getSettings, parseImportedSettings } from '../src/lib/settings';
+import { getSettings, getSettingsData, parseImportedSettings, type SettingsData } from '../src/lib/settings';
 
 describe('settings', () => {
   const get = vi.fn();
@@ -45,12 +45,15 @@ describe('settings', () => {
   });
 
   it('accepts complete imported settings and rejects invalid configurations', () => {
-    const settings = {
+    const settings: SettingsData = {
       enabled: true, collapseGroups: true, organizeAllWindows: false, theme: 'system',
-      groups: [{ id: 'video', name: '视频', color: 'blue', enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }] }],
-    } as const;
+      groups: [{ id: 'video', name: '视频', color: 'auto', enabled: true, rules: [{ id: 'youtube', name: '视频站点', conditions: [{ id: 'youtube-host', field: 'hostname', operator: 'contains', value: 'youtube.com' }] }] }],
+    };
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
 
     expect(parseImportedSettings(settings)).toEqual(settings);
+    expect(parseImportedSettings({ ...settings, savedTabGroups })).toEqual(settings);
+    expect(getSettingsData({ ...settings, savedTabGroups })).toEqual(settings);
     expect(parseImportedSettings({ ...settings, groups: [{ ...settings.groups[0], rules: [] }] })).toBeUndefined();
     expect(parseImportedSettings({ ...settings, theme: 'violet' })).toBeUndefined();
   });

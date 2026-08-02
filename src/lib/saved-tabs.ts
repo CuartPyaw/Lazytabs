@@ -46,6 +46,30 @@ export function normalizeSavedTabGroups(groups?: SavedTabGroup[]): SavedTabGroup
   }];
 }
 
+export function parseOneTabUrls(text: string): { tabs: SavedTab[]; skipped: number } {
+  const tabs: SavedTab[] = [];
+  let skipped = 0;
+
+  for (const line of text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+    const separatorIndex = line.indexOf(' | ');
+    const rawUrl = separatorIndex < 0 ? line : line.slice(0, separatorIndex).trim();
+    const title = separatorIndex < 0 ? rawUrl : line.slice(separatorIndex + 3).trim();
+    try {
+      const url = new URL(rawUrl);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error();
+      tabs.push({ id: nextId('tab'), url: rawUrl, title: title || rawUrl });
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  return { tabs, skipped };
+}
+
+export function serializeOneTabUrls(groups?: SavedTabGroup[]): string {
+  return (groups ?? []).flatMap((group) => group.tabs).map((tab) => `${tab.url} | ${tab.title || tab.url}`).join('\n');
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }

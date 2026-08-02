@@ -100,13 +100,45 @@ describe('OptionsApp interactions', () => {
   it('replaces settings only after confirming a valid import', async () => {
     const importedSettings = { ...storedSettings, theme: 'dark' as const, groups: [] };
     render(<OptionsApp />);
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
+    fireEvent.click(await screen.findByRole('button', { name: '数据' }));
+    fireEvent.change(document.querySelector('input[accept=".json,application/json"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
 
-    expect(await screen.findByRole('dialog', { name: '导入数据' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: '导入设置' })).toBeTruthy();
     expect(storageSet).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: importedSettings }));
+  });
+
+  it('keeps saved tabs separate when importing settings', async () => {
+    const savedTabGroups = [{ id: 'saved-group', name: '默认收纳组', createdAt: 1, tabs: [{ id: 'saved-tab', title: '文档', url: 'https://example.com/docs' }] }];
+    storageGet.mockResolvedValue({ settings: { ...storedSettings, savedTabGroups } });
+    const importedSettings = { ...storedSettings, theme: 'dark' as const, groups: [] };
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '数据' }));
+    fireEvent.change(document.querySelector('input[accept=".json,application/json"]')!, { target: { files: [new File([JSON.stringify(importedSettings)], 'lazytabs.json', { type: 'application/json' })] } });
+    fireEvent.click(await screen.findByRole('button', { name: '确认导入' }));
+
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...importedSettings, savedTabGroups } }));
+  });
+
+  it('appends valid OneTab URLs and reports skipped lines', async () => {
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '数据' }));
+    fireEvent.change(document.querySelector('input[accept=".txt,text/plain"]')!, { target: { files: [new File(['https://example.com/one | Example\nnot-a-url\nhttps://example.com/one | Example'], 'onetab.txt', { type: 'text/plain' })] } });
+
+    await waitFor(() => expect(storageSet).toHaveBeenCalledWith({
+      settings: {
+        ...storedSettings,
+        savedTabGroups: [{
+          id: 'default-saved-group', name: '默认收纳组', createdAt: 0,
+          tabs: [
+            { id: expect.any(String), title: 'Example', url: 'https://example.com/one' },
+            { id: expect.any(String), title: 'Example', url: 'https://example.com/one' },
+          ],
+        }],
+      },
+    }));
+    expect(await screen.findByText('已导入 2 条 URL，跳过 1 条。')).toBeTruthy();
   });
 
   it('shows a newer GitHub release', async () => {

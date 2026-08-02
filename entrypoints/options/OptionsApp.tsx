@@ -1,9 +1,10 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, CircleMinus, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
+import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
-import { getSettings, parseImportedSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
+import { normalizeSavedTabGroups, parseOneTabUrls, serializeOneTabUrls } from '../../src/lib/saved-tabs';
+import { getSettings, getSettingsData, parseImportedSettings, saveSettings, type Settings, type SettingsData, type Theme } from '../../src/lib/settings';
 import { syncGroup } from '../../src/lib/tab-groups';
 
 const operatorLabels: Record<RuleOperator, string> = {
@@ -80,14 +81,16 @@ export function OptionsApp() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();
-  const [importedSettings, setImportedSettings] = useState<Settings>();
+  const [importedSettings, setImportedSettings] = useState<SettingsData>();
   const [importOpen, setImportOpen] = useState(false);
   const [availableRelease, setAvailableRelease] = useState<{ version: string; url: string }>();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string>();
   const [transferMessage, setTransferMessage] = useState<string>();
-  const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance'>('groups');
-  const importInput = useRef<HTMLInputElement>(null);
+  const [oneTabMessage, setOneTabMessage] = useState<string>();
+  const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance' | 'data'>('groups');
+  const settingsImportInput = useRef<HTMLInputElement>(null);
+  const oneTabImportInput = useRef<HTMLInputElement>(null);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -146,13 +149,21 @@ export function OptionsApp() {
     await saveSettings(next);
   }
 
-  function exportSettings() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }));
+  function downloadFile(content: string, filename: string, type: string) {
+    const url = URL.createObjectURL(new Blob([content], { type }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'lazytabs.json';
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportSettings() {
+    downloadFile(JSON.stringify(getSettingsData(settings), null, 2), 'lazytabs.json', 'application/json');
+  }
+
+  function exportOneTabUrls() {
+    downloadFile(serializeOneTabUrls(settings.savedTabGroups), 'lazytabs-onetab.txt', 'text/plain');
   }
 
   async function loadImport(file?: File) {
@@ -170,11 +181,33 @@ export function OptionsApp() {
 
   async function confirmImport() {
     if (!importedSettings) return;
-    await saveSettings(importedSettings);
-    setSettings(importedSettings);
+    const currentSettings = await getSettings();
+    const nextSettings = { ...currentSettings, ...importedSettings };
+    await saveSettings(nextSettings);
+    setSettings(nextSettings);
     setImportedSettings(undefined);
     setImportOpen(false);
     setTransferMessage('设置已导入。');
+  }
+
+  async function loadOneTabImport(file?: File) {
+    if (!file) return;
+    try {
+      const { tabs, skipped } = parseOneTabUrls(await file.text());
+      if (!tabs.length) {
+        setOneTabMessage(`没有可导入的 HTTP(S) URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
+        return;
+      }
+
+      const currentSettings = await getSettings();
+      const [group] = normalizeSavedTabGroups(currentSettings.savedTabGroups);
+      const nextSettings = { ...currentSettings, savedTabGroups: [{ ...group, tabs: [...group.tabs, ...tabs] }] };
+      await saveSettings(nextSettings);
+      setSettings(nextSettings);
+      setOneTabMessage(`已导入 ${tabs.length} 条 URL${skipped ? `，跳过 ${skipped} 条。` : '。'}`);
+    } catch {
+      setOneTabMessage('文件不是有效的 OneTab URL 列表。');
+    }
   }
 
   async function checkForUpdates() {
@@ -294,6 +327,10 @@ export function OptionsApp() {
               <Palette size={17} strokeWidth={1.8} />
               外观
             </button>
+            <button aria-pressed={activeSection === 'data'} className={`mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium ${activeSection === 'data' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-default'}`} type="button" onClick={() => setActiveSection('data')}>
+              <Database size={17} strokeWidth={1.8} />
+              数据
+            </button>
           </div>
         </aside>
 
@@ -305,12 +342,32 @@ export function OptionsApp() {
               <Switch aria-label="整理后自动折叠" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后自动折叠</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
-                <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出数据</Button>
-                <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => importInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入数据</Button>
                 <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>
-                <input ref={importInput} accept=".json,application/json" className="sr-only" type="file" onChange={(event) => { void loadImport(event.target.files?.[0]); event.target.value = ''; }} />
-                {transferMessage && <span className={transferMessage === '设置已导入。' ? 'text-sm text-success' : 'text-sm text-danger'}>{transferMessage}</span>}
                 {updateMessage && <span className="text-sm text-muted">{updateMessage}</span>}
+              </div>
+            </Card.Content>
+          </Card>}
+
+          {activeSection === 'data' && <Card>
+            <Card.Header><div><Card.Title>数据</Card.Title><Card.Description>导入导出设置和默认收纳组中的标签。</Card.Description></div></Card.Header>
+            <Card.Content className="grid gap-6">
+              <div className="grid gap-3">
+                <div><p className="m-0 text-sm font-medium">设置数据</p><p className="m-0 mt-1 text-sm text-muted">包含分组规则、通用选项和主题，不包含默认收纳组。</p></div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportSettings}><Download size={16} strokeWidth={1.9} />导出设置</Button>
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => settingsImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入设置</Button>
+                  <input ref={settingsImportInput} accept=".json,application/json" className="sr-only" type="file" onChange={(event) => { void loadImport(event.target.files?.[0]); event.target.value = ''; }} />
+                  {transferMessage && <span className={transferMessage === '设置已导入。' ? 'text-sm text-success' : 'text-sm text-danger'}>{transferMessage}</span>}
+                </div>
+              </div>
+              <div className="grid gap-3 border-t border-default pt-6">
+                <div><p className="m-0 text-sm font-medium">OneTab URL</p><p className="m-0 mt-1 text-sm text-muted">以文本文件导入或导出默认收纳组中的 URL。</p></div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={exportOneTabUrls}><Download size={16} strokeWidth={1.9} />导出 OneTab URL</Button>
+                  <Button isDisabled={!loaded} size="sm" variant="secondary" onPress={() => oneTabImportInput.current?.click()}><Upload size={16} strokeWidth={1.9} />导入 OneTab URL</Button>
+                  <input ref={oneTabImportInput} accept=".txt,text/plain" className="sr-only" type="file" onChange={(event) => { void loadOneTabImport(event.target.files?.[0]); event.target.value = ''; }} />
+                  {oneTabMessage && <span className={`${oneTabMessage.startsWith('已导入') ? 'text-success' : 'text-danger'} text-sm`}>{oneTabMessage}</span>}
+                </div>
               </div>
             </Card.Content>
           </Card>}
@@ -319,8 +376,8 @@ export function OptionsApp() {
             <Modal.Backdrop className="group-editor-backdrop">
               <Modal.Container className="group-editor-container" placement="center" size="sm">
                 <Modal.Dialog className="w-full rounded-lg p-0">
-                  <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>导入数据</Modal.Heading></Modal.Header>
-                  <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换全部当前设置，包括分组、通用选项和主题。</Modal.Body>
+                  <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>导入设置</Modal.Heading></Modal.Header>
+                  <Modal.Body className="mt-0 px-4 py-5 text-sm text-muted">导入将替换当前分组、通用选项和主题，不会修改默认收纳组。</Modal.Body>
                   <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setImportOpen(false)}>取消</Button><Button onPress={() => void confirmImport()}><Upload size={17} strokeWidth={2} />确认导入</Button></Modal.Footer>
                 </Modal.Dialog>
               </Modal.Container>
