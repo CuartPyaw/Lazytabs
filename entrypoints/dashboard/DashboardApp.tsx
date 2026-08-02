@@ -163,7 +163,7 @@ export function DashboardApp() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col bg-background text-foreground">
+    <main className="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh">
       <header className="border-b border-default bg-background/95 px-4 py-4 backdrop-blur sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
