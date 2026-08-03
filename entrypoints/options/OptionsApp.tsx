@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, CircleMinus, Database, Download, ExternalLink, FolderCog, Globe2, Info, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
+import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Info, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
@@ -385,9 +385,8 @@ export function OptionsApp() {
                   <p className="m-0 mt-0.5 text-sm text-muted">v{chrome.runtime.getManifest().version}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default pt-5">
-                <span className="text-sm font-medium">GitHub 主页</span>
-                <a className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline" href="https://github.com/CuartPyaw/Lazytabs" rel="noreferrer" target="_blank"><ExternalLink size={15} strokeWidth={1.9} />github.com/CuartPyaw/Lazytabs</a>
+              <div className="border-t border-default pt-5">
+                <a className="text-sm font-medium text-primary hover:underline" href="https://github.com/CuartPyaw/Lazytabs" rel="noreferrer" target="_blank">GitHub 主页</a>
               </div>
               <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
                 <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>

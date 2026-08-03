@@ -131,6 +131,6 @@ describe('OptionsApp interactions', () => {
     expect(await screen.findByText('LazyTabs', { exact: true })).toBeTruthy();
     expect(screen.getByText('v1.0.1')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'LazyTabs 图标' }).getAttribute('src')).toBe('chrome-extension://test/icon/128.png');
-    expect(screen.getByRole('link', { name: /github\.com\/CuartPyaw\/Lazytabs/ }).getAttribute('href')).toBe('https://github.com/CuartPyaw/Lazytabs');
+    expect(screen.getByRole('link', { name: 'GitHub 主页' }).getAttribute('href')).toBe('https://github.com/CuartPyaw/Lazytabs');
   });
 });
