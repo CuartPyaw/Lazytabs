@@ -357,9 +357,9 @@ export function OptionsApp() {
           <Modal isOpen={Boolean(availableRelease)} onOpenChange={(isOpen) => { if (!isOpen) setAvailableRelease(undefined); }}>
             <Modal.Backdrop className="group-editor-backdrop">
               <Modal.Container className="group-editor-container" placement="center" size="sm">
-                <Modal.Dialog className="w-full rounded-lg p-0">
-                  <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>发现新版本</Modal.Heading></Modal.Header>
-                  <Modal.Body className="mt-0 grid gap-3 px-4 py-5 text-sm text-muted"><span>新版本：{availableRelease?.version}</span>{availableRelease && <a className="w-fit font-medium text-primary hover:underline" href={availableRelease.url} rel="noreferrer" target="_blank">GitHub Release</a>}</Modal.Body>
+                  <Modal.Dialog className="w-full rounded-[10px] border border-default p-0">
+                    <Modal.Header className="border-b border-default px-4 py-3"><Modal.Heading>发现新版本</Modal.Heading></Modal.Header>
+                    <Modal.Body className="mt-0 flex items-center justify-between gap-3 px-4 py-5 text-sm text-muted"><span>新版本：{availableRelease?.version}</span>{availableRelease && <a className="w-fit shrink-0 font-medium text-primary hover:underline" href={availableRelease.url} rel="noreferrer" target="_blank">GitHub Release</a>}</Modal.Body>
                   <Modal.Footer className="mt-0 border-t border-default px-4 py-4"><Button variant="secondary" onPress={() => setAvailableRelease(undefined)}>关闭</Button></Modal.Footer>
                 </Modal.Dialog>
               </Modal.Container>
