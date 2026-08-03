@@ -35,7 +35,10 @@ beforeEach(() => {
       local: { get: storageGet, set: storageSet.mockResolvedValue(undefined) },
       onChanged: storageChanged,
     },
-    runtime: { getManifest: () => ({ version: '1.0.1' }) },
+    runtime: {
+      getManifest: () => ({ version: '1.0.1' }),
+      getURL: (path: string) => `chrome-extension://test/${path}`,
+    },
   });
 });
 
@@ -111,14 +114,23 @@ describe('OptionsApp interactions', () => {
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: importedSettings }));
   });
 
-  it('shows a newer GitHub release', async () => {
+  it('shows a newer GitHub release when opening About', async () => {
     fetchLatestRelease.mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ tag_name: 'v1.0.2', html_url: 'https://github.com/CuartPyaw/Lazytabs/releases/tag/v1.0.2' }) });
     render(<OptionsApp />);
-    fireEvent.click(await screen.findByRole('button', { name: '通用' }));
-    fireEvent.click(screen.getByRole('button', { name: '检查更新' }));
+    fireEvent.click(await screen.findByRole('button', { name: '关于' }));
 
     expect(await screen.findByRole('dialog', { name: '发现新版本' })).toBeTruthy();
     expect(screen.getByText('新版本：v1.0.2')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'GitHub Release' }).getAttribute('href')).toBe('https://github.com/CuartPyaw/Lazytabs/releases/tag/v1.0.2');
+  });
+
+  it('shows extension name, version, icon and GitHub homepage in About', async () => {
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '关于' }));
+
+    expect(await screen.findByText('LazyTabs', { exact: true })).toBeTruthy();
+    expect(screen.getByText('v1.0.1')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'LazyTabs 图标' }).getAttribute('src')).toBe('chrome-extension://test/icon/128.png');
+    expect(screen.getByRole('link', { name: /github\.com\/CuartPyaw\/Lazytabs/ }).getAttribute('href')).toBe('https://github.com/CuartPyaw/Lazytabs');
   });
 });

@@ -1,5 +1,5 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
-import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Layers3, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
+import { Check, CircleMinus, Database, Download, ExternalLink, FolderCog, Globe2, Info, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
@@ -86,7 +86,7 @@ export function OptionsApp() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string>();
   const [transferMessage, setTransferMessage] = useState<string>();
-  const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance' | 'data'>('groups');
+  const [activeSection, setActiveSection] = useState<'groups' | 'general' | 'appearance' | 'data' | 'about'>('groups');
   const settingsImportInput = useRef<HTMLInputElement>(null);
   const { setTheme } = useTheme();
 
@@ -114,6 +114,10 @@ export function OptionsApp() {
   useEffect(() => {
     setTheme(settings.theme);
   }, [setTheme, settings.theme]);
+
+  useEffect(() => {
+    if (activeSection === 'about') void checkForUpdates();
+  }, [activeSection]);
 
   const groupNameError = error === '请输入分组名称。' || error === '分组名称已存在。';
   const conditionError = Boolean(error && !groupNameError);
@@ -282,13 +286,7 @@ export function OptionsApp() {
     <main className="min-h-[100dvh] bg-default/35 text-foreground">
       <header className="border-b border-default bg-surface">
         <div className="mx-auto flex max-w-6xl items-center px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm"><Layers3 size={21} strokeWidth={2} /></span>
-            <div>
-              <h1 className="m-0 text-lg font-semibold">LazyTabs</h1>
-              <p className="m-0 mt-0.5 text-sm text-muted">标签页自动分组设置</p>
-            </div>
-          </div>
+          <h1 className="m-0 text-lg font-semibold">设置</h1>
         </div>
       </header>
 
@@ -311,6 +309,10 @@ export function OptionsApp() {
               <Database size={17} strokeWidth={1.8} />
               数据
             </button>
+            <button aria-pressed={activeSection === 'about'} className={`mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium ${activeSection === 'about' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-default'}`} type="button" onClick={() => setActiveSection('about')}>
+              <Info size={17} strokeWidth={1.8} />
+              关于
+            </button>
           </div>
         </aside>
 
@@ -322,10 +324,6 @@ export function OptionsApp() {
               <Switch aria-label="整理后折叠其他分组" className="soft-switch" isSelected={settings.collapseGroups} onChange={(collapseGroups) => void updateCollapseGroups(collapseGroups)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后折叠其他分组</Switch.Content></Switch>
               <Switch aria-label="整理后把未分组标签页移到最后一个分组后面" className="soft-switch" isSelected={settings.moveUngroupedToEnd} onChange={(moveUngroupedToEnd) => void updateMoveUngroupedToEnd(moveUngroupedToEnd)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理后把未分组标签页移到最后一个分组后面</Switch.Content></Switch>
               <Switch aria-label="整理全部窗口" className="soft-switch" isSelected={settings.organizeAllWindows} onChange={(organizeAllWindows) => void updateOrganizeAllWindows(organizeAllWindows)}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control>整理全部窗口</Switch.Content></Switch>
-              <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
-                <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>
-                {updateMessage && <span className="text-sm text-muted">{updateMessage}</span>}
-              </div>
             </Card.Content>
           </Card>}
 
@@ -374,6 +372,27 @@ export function OptionsApp() {
               <RadioGroup aria-label="主题" className="grid max-w-lg grid-cols-3 gap-4" value={settings.theme} onChange={(theme) => void updateTheme(theme as Theme)}>
                 {themeOptions.map(({ value, label }) => <Radio key={value} className="w-full" value={value}><Radio.Content className={({ isSelected }) => `theme-choice ${isSelected ? 'theme-choice-selected' : ''}`}><span aria-hidden="true" className={`theme-preview theme-preview-${value}`}><span className="theme-preview-window"><span className="theme-preview-title" /><span className="theme-preview-line" /><span className="theme-preview-line theme-preview-line-short" /></span></span><span>{label}</span></Radio.Content></Radio>)}
               </RadioGroup>
+            </Card.Content>
+          </Card>}
+
+          {activeSection === 'about' && <Card>
+            <Card.Header><div><Card.Title>关于</Card.Title><Card.Description>扩展信息与更新。</Card.Description></div></Card.Header>
+            <Card.Content className="grid gap-5">
+              <div className="flex items-center gap-3">
+                <img alt="LazyTabs 图标" className="size-14 rounded-2xl" src={chrome.runtime.getURL('icon/128.png')} />
+                <div>
+                  <p className="m-0 text-base font-semibold">LazyTabs</p>
+                  <p className="m-0 mt-0.5 text-sm text-muted">v{chrome.runtime.getManifest().version}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default pt-5">
+                <span className="text-sm font-medium">GitHub 主页</span>
+                <a className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline" href="https://github.com/CuartPyaw/Lazytabs" rel="noreferrer" target="_blank"><ExternalLink size={15} strokeWidth={1.9} />github.com/CuartPyaw/Lazytabs</a>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 border-t border-default pt-5">
+                <Button isDisabled={checkingUpdate} size="sm" variant="secondary" onPress={() => void checkForUpdates()}><RefreshCw size={16} strokeWidth={1.9} />{checkingUpdate ? '正在检查...' : '检查更新'}</Button>
+                {updateMessage && <span className="text-sm text-muted">{updateMessage}</span>}
+              </div>
             </Card.Content>
           </Card>}
 
