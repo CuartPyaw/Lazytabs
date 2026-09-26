@@ -2,7 +2,7 @@ import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, S
 import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Info, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
+import { GROUP_COLORS, type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
 import { getSettings, parseImportedSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
 import { syncGroup } from '../../src/lib/tab-groups';
 
@@ -266,6 +266,7 @@ export function OptionsApp() {
 
     const group: Group = {
       ...draft,
+      color: draft.color === 'auto' ? GROUP_COLORS[Math.floor(Math.random() * GROUP_COLORS.length)] : draft.color,
       id: editingId ?? nextId(),
       name: draft.name.trim(),
       rules: draft.rules.map((rule) => ({

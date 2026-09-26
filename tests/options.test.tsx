@@ -44,6 +44,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -76,7 +77,8 @@ describe('OptionsApp interactions', () => {
     expect(screen.getByRole('button', { name: '添加匹配规则' })).toBeTruthy();
   });
 
-  it('creates one group with multiple contained rules', async () => {
+  it('persists the selected automatic color and shows it in settings', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.15); // blue
     render(<OptionsApp />);
     fireEvent.click(await screen.findByRole('button', { name: '添加分组' }));
     fireEvent.change(screen.getByLabelText('分组名称'), { target: { value: '代码' } });
@@ -91,7 +93,7 @@ describe('OptionsApp interactions', () => {
         groups: [
           ...storedSettings.groups,
           {
-            id: expect.any(String), name: '代码', color: 'auto', enabled: true,
+            id: expect.any(String), name: '代码', color: 'blue', enabled: true,
             rules: [
               { id: expect.any(String), name: 'github', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'github' }] },
               { id: expect.any(String), name: 'gitlab', conditions: [{ id: expect.any(String), field: 'hostname', operator: 'contains', value: 'gitlab' }] },
@@ -100,6 +102,7 @@ describe('OptionsApp interactions', () => {
         ],
       },
     }));
+    expect(await screen.findAllByText('蓝色')).toHaveLength(2); // existing and newly created groups
   });
 
   it('replaces settings only after confirming a valid import', async () => {
