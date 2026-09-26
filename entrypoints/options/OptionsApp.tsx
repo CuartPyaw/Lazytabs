@@ -1,6 +1,7 @@
 import { Button, Card, Chip, Input, ListBox, Modal, Radio, RadioGroup, Select, Skeleton, Switch, useTheme } from '@heroui/react';
 import { Check, CircleMinus, Database, Download, FolderCog, Globe2, Info, Palette, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import { GROUP_COLORS, type Group, type GroupInput, type MatchCondition, type Rule, type RuleColor, type RuleField, type RuleOperator, validateGroup } from '../../src/lib/rules';
 import { getSettings, parseImportedSettings, saveSettings, type Settings, type Theme } from '../../src/lib/settings';
@@ -132,7 +133,12 @@ export function OptionsApp() {
   async function updateTheme(theme: Theme) {
     const currentSettings = await getSettings();
     const next = { ...currentSettings, theme };
-    setSettings(next);
+    const apply = () => flushSync(() => { setSettings(next); setTheme(theme); });
+    if (document.startViewTransition && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      await document.startViewTransition(apply).updateCallbackDone;
+    } else {
+      apply();
+    }
     await saveSettings(next);
   }
 

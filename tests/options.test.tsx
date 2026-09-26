@@ -43,6 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete (document as { startViewTransition?: unknown }).startViewTransition;
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -54,6 +55,16 @@ describe('OptionsApp interactions', () => {
     fireEvent.click(await screen.findByRole('button', { name: '外观' }));
     fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
     await waitFor(() => expect(storageSet).toHaveBeenCalledWith({ settings: { ...storedSettings, theme: 'dark' } }));
+  });
+
+  it('animates a manual theme change, but not the initial theme load', async () => {
+    const startViewTransition = vi.fn((update: () => void) => { update(); return { updateCallbackDone: Promise.resolve() }; });
+    document.startViewTransition = startViewTransition as unknown as typeof document.startViewTransition;
+    render(<OptionsApp />);
+    fireEvent.click(await screen.findByRole('button', { name: '外观' }));
+    expect(startViewTransition).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('radio', { name: '深色' }));
+    await waitFor(() => expect(startViewTransition).toHaveBeenCalledOnce());
   });
 
   it('persists moving ungrouped tabs after the last group', async () => {
